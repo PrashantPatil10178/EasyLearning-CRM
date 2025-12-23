@@ -1,70 +1,170 @@
 import { NextRequest, NextResponse } from "next/server";
+import { RateLimiterMemory } from "rate-limiter-flexible";
 import { db } from "@/server/db";
+
+// Rate limiter: 3 OTP requests per 15 minutes per IP
+const rateLimiter = new RateLimiterMemory({
+  keyPrefix: "otp_send",
+  points: 3,
+  duration: 60 * 15, // 15 minutes
+});
 
 // Generate random 6-digit OTP
 function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+// Send OTP via AISensy WhatsApp
+const sendOTPViaAisensy = async (
+  phone: string,
+  otp: string,
+  userName: string,
+) => {
+  // Skip actual SMS sending in non-production environments
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`🔑 DEMO OTP for ${phone}: ${otp}`);
+    return { success: "true" };
+  }
+
+  const AISENSY_API_URL = process.env.AISENSY_API_URL;
+  const AISENSY_API_KEY = process.env.AISENSY_API_KEY;
+
+  if (!AISENSY_API_URL || !AISENSY_API_KEY) {
+    console.warn("AISensy credentials not configured. Skipping OTP send.");
+    return { success: "true" }; // Allow in dev mode
+  }
+
+  const payload = {
+    apiKey: AISENSY_API_KEY,
+    campaignName: "Verify OTP",
+    destination: phone,
+    userName: userName || "User",
+    templateParams: [otp],
+    buttons: [
+      {
+        type: "button",
+        sub_type: "url",
+        index: 0,
+        parameters: [
+          {
+            type: "text",
+            text: otp,
+          },
+        ],
+      },
+    ],
+  };
+
+  try {
+    const response = await fetch(AISENSY_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    return await response.json();
+  } catch (error) {
+    console.error("AISensy API error:", error);
+    throw new Error("Failed to send OTP via AISensy");
+  }
+};
+
 export async function POST(request: NextRequest) {
   try {
+    // Get client IP for rate limiting
+    const ip =
+      (request.headers.get("x-forwarded-for") || "").split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      "unknown";
+
+    // Apply rate limiting
+    try {
+      await rateLimiter.consume(ip);
+    } catch {
+      return NextResponse.json(
+        { error: "Too many OTP requests. Please try again later." },
+        { status: 429 },
+      );
+    }
+
     const body = await request.json();
     const { phone, name } = body;
 
     // Validate input
-    if (!phone || !name) {
+    if (!phone) {
       return NextResponse.json(
-        { error: "Phone and name are required" },
+        { error: "Phone number is required" },
         { status: 400 },
       );
     }
 
-    // Validate phone number format (10 digits)
-    const cleanPhone = phone.replace(/\D/g, "");
-    if (cleanPhone.length !== 10) {
+    // Clean and format phone number
+    const cleanedPhone = phone.replace(/\D/g, "");
+    let formattedPhone = cleanedPhone;
+
+    // Add country code if not present
+    if (cleanedPhone.length === 10) {
+      formattedPhone = `+91${cleanedPhone}`;
+    } else if (cleanedPhone.length > 10 && !cleanedPhone.startsWith("+")) {
+      formattedPhone = `+${cleanedPhone}`;
+    }
+
+    // Validate phone number format
+    if (!/^\+\d{10,15}$/.test(formattedPhone)) {
       return NextResponse.json(
-        { error: "Please enter a valid 10-digit mobile number" },
+        { error: "Invalid phone number format" },
         { status: 400 },
       );
     }
 
     // Generate OTP
     const otp = generateOTP();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
     // Store OTP in database using Prisma
     await db.otp.create({
       data: {
-        phone: cleanPhone,
+        phone: formattedPhone,
         otp,
         expiresAt,
       },
     });
 
-    // TODO: Send OTP via WhatsApp using AISensy or similar service
-    // For now, we'll just log it (in production, integrate with WhatsApp API)
-    console.log(`OTP for ${cleanPhone}: ${otp}`);
-    console.log(`Name: ${name}`);
-
-    // In development, you can return the OTP for testing
-    // Remove this in production!
-    if (process.env.NODE_ENV === "development") {
+    // In development, show the OTP in the response
+    if (process.env.NODE_ENV !== "production") {
       return NextResponse.json({
         success: true,
-        message: "OTP sent successfully",
-        // Only for development/testing
-        dev_otp: otp,
+        message: "OTP created for demo (not sent via SMS)",
+        phone: formattedPhone.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3"),
+        demoOTP: otp, // Only include in non-production
       });
     }
 
-    return NextResponse.json({
-      success: true,
-      message: "OTP sent successfully",
-    });
+    // Send OTP via AISensy WhatsApp
+    const aisensyResponse = await sendOTPViaAisensy(
+      formattedPhone,
+      otp,
+      name || "User",
+    );
+
+    if (aisensyResponse.success === "true") {
+      return NextResponse.json({
+        success: true,
+        message: "OTP sent successfully via WhatsApp",
+        phone: formattedPhone.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3"),
+      });
+    } else {
+      console.error("AISensy API error:", aisensyResponse);
+      return NextResponse.json(
+        { error: "Failed to send OTP. Please try again." },
+        { status: 500 },
+      );
+    }
   } catch (error) {
-    console.error("Error sending OTP:", error);
+    console.error("Send OTP error:", error);
     return NextResponse.json(
-      { error: "Failed to send OTP. Please try again." },
+      { error: "Internal server error" },
       { status: 500 },
     );
   }

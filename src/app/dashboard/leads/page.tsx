@@ -64,6 +64,7 @@ import Link from "next/link";
 import { LeadFormDialog } from "@/components/leads/lead-form-dialog";
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
 import { ImportLeadsDialog } from "@/components/leads/import-leads-dialog";
+import { LeadStatusUpdateDialog } from "@/components/leads/lead-status-update-dialog";
 import { toast } from "sonner";
 
 const priorityStyles: Record<string, string> = {
@@ -107,6 +108,7 @@ export default function LeadsPage() {
   const [editingLead, setEditingLead] = useState<any>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [callingLeadId, setCallingLeadId] = useState<string | null>(null);
+  const [statusUpdateLead, setStatusUpdateLead] = useState<any>(null);
 
   const limit = 15;
 
@@ -166,6 +168,8 @@ export default function LeadsPage() {
       });
       const data = await response.json();
       if (response.ok) {
+        // Open status update dialog after successful call
+        setStatusUpdateLead(lead);
         toast.success("CallerDesk call initiated!");
       } else {
         toast.error(data.error || "Failed to initiate call");
@@ -739,6 +743,17 @@ export default function LeadsPage() {
           lead={editingLead}
         />
       )}
+
+      {/* Status Update Dialog - After Call */}
+      <LeadStatusUpdateDialog
+        open={!!statusUpdateLead}
+        onOpenChange={(open) => !open && setStatusUpdateLead(null)}
+        lead={statusUpdateLead}
+        onSuccess={() => {
+          refetch();
+          setStatusUpdateLead(null);
+        }}
+      />
     </PageContainer>
   );
 }

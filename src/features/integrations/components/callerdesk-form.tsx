@@ -628,6 +628,7 @@ export function CallerDeskForm() {
                                 name: cdMember.member_name || "Unknown",
                                 email: cdMember.member_email,
                                 password: cdMember.password || "CallerDesk123",
+                                phone: cdMember.member_num || undefined,
                                 role:
                                   cdMember.access === "1" ? "ADMIN" : "AGENT",
                               });

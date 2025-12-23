@@ -18,6 +18,8 @@ export const env = createEnv({
     DATABASE_URL: z.string().url(),
     RAZORPAY_KEY_ID: z.string(),
     RAZORPAY_KEY_SECRET: z.string(),
+    AISENSY_API_URL: z.string().optional(),
+    AISENSY_API_KEY: z.string().optional(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
@@ -45,6 +47,8 @@ export const env = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
     RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID,
     RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET,
+    AISENSY_API_URL: process.env.AISENSY_API_URL,
+    AISENSY_API_KEY: process.env.AISENSY_API_KEY,
     NEXT_PUBLIC_RAZORPAY_KEY_ID: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
     NODE_ENV: process.env.NODE_ENV,
   },
