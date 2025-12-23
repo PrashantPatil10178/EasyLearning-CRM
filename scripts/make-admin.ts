@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -6,6 +7,11 @@ async function makeAdmin() {
   try {
     const phone = "7620170904";
     const name = "Prashant Patil";
+    const email = "prashant@easylearning.com";
+    const password = "admin123"; // Demo password
+
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 12);
 
     // Find user by phone
     let user = await prisma.user.findUnique({
@@ -22,11 +28,15 @@ async function makeAdmin() {
         data: {
           phone,
           name,
+          email,
+          password: hashedPassword,
           role: "SUPER_ADMIN",
         },
       });
 
       console.log(`✅ Created new SUPER_ADMIN user: ${name} (${phone})`);
+      console.log(`📧 Email: ${email}`);
+      console.log(`🔑 Password: ${password}`);
     } else {
       // Update existing user to SUPER_ADMIN
       user = await prisma.user.update({
@@ -34,10 +44,17 @@ async function makeAdmin() {
         data: {
           role: "SUPER_ADMIN",
           name, // Update name if needed
+          email, // Update email
+          password: hashedPassword, // Update password
         },
       });
 
       console.log(`✅ Updated ${name} (${phone}) to SUPER_ADMIN role`);
+      console.log(`📧 Email: ${email}`);
+      console.log(`🔑 Password: ${password}`);
+      console.log("\n🔐 Demo Credentials for Login:");
+      console.log(`Email: ${email}`);
+      console.log(`Password: ${password}`);
     }
 
     console.log("\nUser Details:");
