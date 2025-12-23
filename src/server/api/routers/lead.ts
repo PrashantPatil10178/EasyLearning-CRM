@@ -126,7 +126,7 @@ export const leadRouter = createTRPCRouter({
       // Check access - AGENT and VIEWER can only view their own leads
       const userRole = ctx.session.user.role;
       const isRestrictedUser = ["AGENT", "VIEWER"].includes(userRole);
-      
+
       if (isRestrictedUser && lead.ownerId !== ctx.session.user.id) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -241,7 +241,7 @@ export const leadRouter = createTRPCRouter({
       // Check access - AGENT and VIEWER can only update their own leads
       const userRole = ctx.session.user.role;
       const isRestrictedUser = ["AGENT", "VIEWER"].includes(userRole);
-      
+
       if (isRestrictedUser && currentLead.ownerId !== ctx.session.user.id) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -296,7 +296,7 @@ export const leadRouter = createTRPCRouter({
       // Check access - AGENT and VIEWER can only delete their own leads
       const userRole = ctx.session.user.role;
       const isRestrictedUser = ["AGENT", "VIEWER"].includes(userRole);
-      
+
       if (isRestrictedUser && lead.ownerId !== ctx.session.user.id) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -561,11 +561,11 @@ export const leadRouter = createTRPCRouter({
   // Get lead stats
   getStats: protectedWorkspaceProcedure.query(async ({ ctx }) => {
     const workspaceId = ctx.workspaceId;
-    
+
     // Check user role - AGENT and VIEWER can only see their own lead stats
     const userRole = ctx.session.user.role;
     const isRestrictedUser = ["AGENT", "VIEWER"].includes(userRole);
-    
+
     const whereCondition = {
       workspaceId,
       ...(isRestrictedUser && { ownerId: ctx.session.user.id }),
@@ -575,9 +575,15 @@ export const leadRouter = createTRPCRouter({
       await Promise.all([
         ctx.db.lead.count({ where: whereCondition }),
         ctx.db.lead.count({ where: { ...whereCondition, status: "NEW" } }),
-        ctx.db.lead.count({ where: { ...whereCondition, status: "CONTACTED" } }),
-        ctx.db.lead.count({ where: { ...whereCondition, status: "QUALIFIED" } }),
-        ctx.db.lead.count({ where: { ...whereCondition, status: "CONVERTED" } }),
+        ctx.db.lead.count({
+          where: { ...whereCondition, status: "CONTACTED" },
+        }),
+        ctx.db.lead.count({
+          where: { ...whereCondition, status: "QUALIFIED" },
+        }),
+        ctx.db.lead.count({
+          where: { ...whereCondition, status: "CONVERTED" },
+        }),
         ctx.db.lead.count({
           where: {
             ...whereCondition,
