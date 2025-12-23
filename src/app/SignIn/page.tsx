@@ -23,17 +23,17 @@ import { toast } from "sonner";
 
 export default function SignInPage() {
   const [loginMethod, setLoginMethod] = useState<"email" | "phone">("email");
-  
+
   // Email login state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  
+
   // Phone login state
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
-  
+
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -192,9 +192,9 @@ export default function SignInPage() {
                   Phone
                 </TabsTrigger>
               </TabsList>
-              
+
               {/* Email Login */}
-              <TabsContent value="email" className="space-y-4 mt-4">
+              <TabsContent value="email" className="mt-4 space-y-4">
                 <form onSubmit={handleEmailSignIn} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="email">Email Address</Label>
@@ -241,7 +241,7 @@ export default function SignInPage() {
               </TabsContent>
 
               {/* Phone Login */}
-              <TabsContent value="phone" className="space-y-4 mt-4">
+              <TabsContent value="phone" className="mt-4 space-y-4">
                 {!otpSent ? (
                   <form onSubmit={handleSendOTP} className="space-y-4">
                     <div className="space-y-2">
@@ -335,7 +335,9 @@ export default function SignInPage() {
                         inputMode="numeric"
                         placeholder="000000"
                         value={otp}
-                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                        onChange={(e) =>
+                          setOtp(e.target.value.replace(/\D/g, ""))
+                        }
                         maxLength={6}
                         pattern="[0-9]{6}"
                         required
