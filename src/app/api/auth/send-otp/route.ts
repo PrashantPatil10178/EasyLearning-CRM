@@ -63,7 +63,26 @@ const sendOTPViaAisensy = async (
       },
       body: JSON.stringify(payload),
     });
-    return await response.json();
+
+    // AISensy returns plain text "Success." on success
+    const responseText = await response.text();
+
+    if (
+      response.ok &&
+      (responseText.includes("Success") || responseText.includes("success"))
+    ) {
+      return { success: "true" };
+    }
+
+    // Try to parse as JSON for error responses
+    try {
+      const jsonResponse = JSON.parse(responseText);
+      return jsonResponse;
+    } catch {
+      // If not JSON and not success, return the text
+      console.error("AISensy response:", responseText);
+      return { success: "false", error: responseText };
+    }
   } catch (error) {
     console.error("AISensy API error:", error);
     throw new Error("Failed to send OTP via AISensy");
