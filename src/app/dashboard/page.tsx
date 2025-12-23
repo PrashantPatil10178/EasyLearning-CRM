@@ -45,7 +45,7 @@ export default async function Dashboard() {
   } catch (error) {
     // If we fail to get stats (likely due to missing workspace context),
     // redirect to the first available workspace.
-    return <WorkspaceRedirect workspaceId={workspaces[0].id} />;
+    return <WorkspaceRedirect workspaceId={workspaces[0]!.id} />;
   }
 
   // Get current time for greeting

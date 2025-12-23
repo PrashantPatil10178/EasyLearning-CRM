@@ -464,14 +464,18 @@ export default function LeadDetailPage() {
                                 {task.description || (task as any).note}
                               </p>
                             </div>
-                            {task.assignee && (
+                            {(task as any).assignee && (
                               <Avatar
                                 className="h-6 w-6"
-                                title={task.assignee.name || ""}
+                                title={(task as any).assignee.name || ""}
                               >
-                                <AvatarImage src={task.assignee.image || ""} />
+                                <AvatarImage
+                                  src={(task as any).assignee.image || ""}
+                                />
                                 <AvatarFallback className="text-[10px]">
-                                  {getInitials(task.assignee.name || "")}
+                                  {getInitials(
+                                    (task as any).assignee.name || "",
+                                  )}
                                 </AvatarFallback>
                               </Avatar>
                             )}

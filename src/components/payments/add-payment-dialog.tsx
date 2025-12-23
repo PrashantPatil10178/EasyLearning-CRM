@@ -78,7 +78,7 @@ export function AddPaymentDialog({
     }
 
     await createPaymentMutation.mutateAsync({
-      dealId,
+      leadId: dealId,
       amount: Number(amount),
       paymentMode: paymentMode as never,
       status: status as never,

@@ -71,13 +71,18 @@ export default function WhatsAppTriggersPage() {
     field: keyof TriggerState,
     value: any,
   ) => {
-    setTriggers((prev) => ({
-      ...prev,
-      [status]: {
-        ...prev[status],
-        [field]: value,
-      },
-    }));
+    setTriggers((prev) => {
+      const currentTrigger = prev[status];
+      if (!currentTrigger) return prev;
+
+      return {
+        ...prev,
+        [status]: {
+          ...currentTrigger,
+          [field]: value,
+        } as TriggerState,
+      };
+    });
   };
 
   const handleSave = async () => {
@@ -88,6 +93,8 @@ export default function WhatsAppTriggersPage() {
       // Validate JSON before saving
       for (const status of STATUSES) {
         const t = triggers[status];
+        if (!t) continue;
+
         try {
           JSON.parse(t.templateParamsJson);
         } catch (e) {
@@ -109,7 +116,11 @@ export default function WhatsAppTriggersPage() {
 
       // Save all triggers
       await Promise.all(
-        STATUSES.map((status) => upsertMutation.mutateAsync(triggers[status])),
+        STATUSES.map((status) => {
+          const trigger = triggers[status];
+          if (!trigger) return Promise.resolve();
+          return upsertMutation.mutateAsync(trigger);
+        }),
       );
 
       toast.success("WhatsApp triggers saved successfully");

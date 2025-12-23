@@ -93,12 +93,14 @@ export async function POST(request: NextRequest) {
 
     try {
       const config = JSON.parse(integration.config);
-      console.log(config);
 
       // Decrypt API key if encrypted
       authCode = config.apiKey;
       if (authCode && isEncrypted(authCode)) {
+        console.log("[CallerDesk] Decrypting API key");
         authCode = decrypt(authCode);
+      } else {
+        console.log("[CallerDesk] Using plain API key");
       }
 
       // Decrypt secret key if encrypted (though we use API key for auth)
@@ -107,6 +109,9 @@ export async function POST(request: NextRequest) {
       }
 
       deskPhone = config.deskPhone;
+
+      console.log("[CallerDesk] Auth code length:", authCode?.length);
+      console.log("[CallerDesk] Desk phone:", deskPhone);
     } catch (e) {
       console.error("Failed to parse integration config", e);
       return NextResponse.json(
@@ -135,27 +140,31 @@ export async function POST(request: NextRequest) {
     console.log(
       `[CallerDesk] Agent: ${agentPhone}, Customer: ${customerPhone}`,
     );
+    console.log(
+      `[CallerDesk] Auth Code (first 8 chars): ${authCode.substring(0, 8)}...`,
+    );
+    console.log(`[CallerDesk] Desk Phone: ${deskPhone}`);
 
     // Construct CallerDesk API request
     // Endpoint: https://app.callerdesk.io/api/click_to_call_v2
-    const baseUrl = "https://app.callerdesk.io/api/click_to_call_v2";
+    // CallerDesk expects GET request with query parameters
+    const params = new URLSearchParams({
+      calling_party_a: agentPhone,
+      calling_party_b: customerPhone,
+      deskphone: deskPhone,
+      call_from_did: callFromDid,
+      authcode: authCode,
+    });
 
-    // CallerDesk expects FormData
-    const formData = new FormData();
-    formData.append("calling_party_a", agentPhone);
-    formData.append("calling_party_b", customerPhone);
-    formData.append("deskphone", deskPhone);
-    formData.append("call_from_did", callFromDid);
-    formData.append("authcode", authCode);
+    const apiUrl = `https://app.callerdesk.io/api/click_to_call_v2?${params.toString()}`;
 
     console.log(
       `[CallerDesk] Initiating call - Agent: ${agentPhone}, Customer: ${customerPhone}, Desk: ${deskPhone}`,
     );
 
-    // Execute Request with FormData
-    const response = await fetch(baseUrl, {
-      method: "POST",
-      body: formData,
+    // Execute GET Request with query parameters
+    const response = await fetch(apiUrl, {
+      method: "GET",
     });
 
     const responseText = await response.text();
