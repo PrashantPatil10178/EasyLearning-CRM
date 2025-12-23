@@ -28,10 +28,12 @@ import { db } from "@/server/db";
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
   const session = await auth();
+  const workspaceId = opts.headers.get("x-workspace-id");
 
   return {
     db,
     session,
+    workspaceId,
     ...opts,
   };
 };
@@ -155,3 +157,72 @@ export const adminProcedure = t.procedure
       },
     });
   });
+
+/**
+ * Protected Workspace procedure
+ *
+ * Ensures the user is authenticated and is a member of the requested workspace.
+ */
+export const protectedWorkspaceProcedure = protectedProcedure.use(
+  async ({ ctx, next }) => {
+    const { workspaceId, db, session } = ctx;
+
+    if (!workspaceId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Workspace ID is missing",
+      });
+    }
+
+    // Check if user is a member of the workspace
+    const member = await db.workspaceMember.findUnique({
+      where: {
+        workspaceId_userId: {
+          workspaceId,
+          userId: session.user.id,
+        },
+      },
+    });
+
+    if (!member && session.user.role !== "SUPER_ADMIN") {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "You are not a member of this workspace",
+      });
+    }
+
+    return next({
+      ctx: {
+        workspaceId,
+        workspaceMember: member,
+      },
+    });
+  },
+);
+
+/**
+ * Admin Workspace procedure
+ *
+ * Ensures the user is an ADMIN or OWNER of the workspace.
+ */
+export const adminWorkspaceProcedure = protectedWorkspaceProcedure.use(
+  async ({ ctx, next }) => {
+    const { workspaceMember, session } = ctx;
+
+    if (session.user.role === "SUPER_ADMIN") {
+      return next();
+    }
+
+    if (
+      !workspaceMember ||
+      !["ADMIN", "MANAGER"].includes(workspaceMember.role)
+    ) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "You don't have admin permissions in this workspace",
+      });
+    }
+
+    return next();
+  },
+);

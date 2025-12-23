@@ -1,21 +1,22 @@
-# MHT CET Prep
+# EasyLearning CRM
 
-**Master MHT CET with AI-Powered Learning** 🚀
-
-Visit us at [mhtcet.app](https://mhtcet.app)
+**Powerful CRM for Educational Organizations** 🚀
 
 ## About
 
-MHT CET Prep is an AI-powered preparation platform designed to help engineering aspirants excel in the Maharashtra Common Entrance Test (MHT CET). Our platform combines personalized learning paths, adaptive testing, and real-time performance analytics to transform your preparation experience.
+EasyLearning CRM is a comprehensive Customer Relationship Management system designed specifically for educational organizations. Built with modern technologies, it helps you manage leads, track deals, automate workflows, and grow your educational business efficiently.
 
 ### Key Features
 
-- 🤖 **AI-Powered Learning**: Personalized study plans that adapt to your learning style
-- 🎯 **Precision Testing**: Targeted questions based on your weak areas
-- 📊 **Advanced Analytics**: Comprehensive performance tracking with detailed insights
-- 📚 **Rich Content Library**: 50,000+ questions with detailed solutions
-- 🏆 **Achievement System**: Gamified learning experience with badges and streaks
-- 👥 **Community Support**: Connect with educators and successful alumni
+- 📊 **Lead Management**: Capture, track, and nurture leads from multiple sources
+- 💰 **Deal Pipeline**: Visual Kanban board with payment tracking
+- 📞 **Call Tracking**: Log and record all customer interactions
+- 📧 **Campaign Management**: Create and track marketing campaigns
+- 👥 **Team Collaboration**: Role-based access control (Admin, Manager, Agent, Viewer)
+- 📈 **Analytics & Reports**: Comprehensive dashboards and performance metrics
+- 📁 **Bulk Operations**: Import/export leads, bulk edit, and bulk assignment
+- 💳 **Payment Tracking**: Track payments with multiple modes and statuses
+- 🎓 **Course Management**: Manage courses, batches, and student enrollments
 
 ## Tech Stack
 

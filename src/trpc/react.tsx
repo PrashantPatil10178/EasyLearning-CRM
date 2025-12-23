@@ -56,6 +56,16 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
           headers: () => {
             const headers = new Headers();
             headers.set("x-trpc-source", "nextjs-react");
+
+            // Add workspace ID from cookie if available
+            if (typeof window !== "undefined") {
+              const match = document.cookie.match(
+                new RegExp("(^| )workspace-id=([^;]+)"),
+              );
+              if (match) {
+                headers.set("x-workspace-id", match[2]);
+              }
+            }
             return headers;
           },
         }),

@@ -31,10 +31,10 @@ export const agentNavItems: NavItem[] = [
     items: [],
   },
   {
-    title: "Deals",
-    url: "/dashboard/deals",
-    icon: "briefcase",
-    shortcut: ["d", "e"],
+    title: "Campaigns",
+    url: "/dashboard/campaigns",
+    icon: "megaphone",
+    shortcut: ["c", "m"],
     isActive: false,
     items: [],
   },
@@ -55,9 +55,17 @@ export const agentNavItems: NavItem[] = [
     items: [],
   },
   {
-    title: "Account",
+    title: "Integrations",
+    url: "/dashboard/integrations",
+    icon: "plug",
+    shortcut: ["i", "n"],
+    isActive: false,
+    items: [],
+  },
+  {
+    title: "Settings",
     url: "#",
-    icon: "user",
+    icon: "settings",
     isActive: true,
     items: [
       {
@@ -65,6 +73,12 @@ export const agentNavItems: NavItem[] = [
         url: "/dashboard/profile",
         icon: "userPen",
         shortcut: ["m", "m"],
+      },
+      {
+        title: "Users",
+        url: "/dashboard/users",
+        icon: "users",
+        shortcut: ["u", "u"],
       },
       {
         title: "Settings",
@@ -95,10 +109,10 @@ export const managerNavItems: NavItem[] = [
     items: [],
   },
   {
-    title: "Deals",
-    url: "/dashboard/deals",
-    icon: "briefcase",
-    shortcut: ["d", "e"],
+    title: "Campaigns",
+    url: "/dashboard/campaigns",
+    icon: "megaphone",
+    shortcut: ["c", "m"],
     isActive: false,
     items: [],
   },
@@ -119,14 +133,6 @@ export const managerNavItems: NavItem[] = [
     items: [],
   },
   {
-    title: "Campaigns",
-    url: "/dashboard/campaigns",
-    icon: "megaphone",
-    shortcut: ["c", "m"],
-    isActive: false,
-    items: [],
-  },
-  {
     title: "Team",
     url: "/dashboard/team",
     icon: "usersGroup",
@@ -135,17 +141,17 @@ export const managerNavItems: NavItem[] = [
     items: [],
   },
   {
-    title: "Reports",
-    url: "/dashboard/reports",
-    icon: "barChart",
-    shortcut: ["r", "r"],
+    title: "Integrations",
+    url: "/dashboard/integrations",
+    icon: "plug",
+    shortcut: ["i", "n"],
     isActive: false,
     items: [],
   },
   {
-    title: "Account",
+    title: "Settings",
     url: "#",
-    icon: "user",
+    icon: "settings",
     isActive: true,
     items: [
       {
@@ -153,6 +159,12 @@ export const managerNavItems: NavItem[] = [
         url: "/dashboard/profile",
         icon: "userPen",
         shortcut: ["m", "m"],
+      },
+      {
+        title: "Users",
+        url: "/dashboard/users",
+        icon: "users",
+        shortcut: ["u", "u"],
       },
       {
         title: "Settings",
@@ -183,10 +195,10 @@ export const adminNavItems: NavItem[] = [
     items: [],
   },
   {
-    title: "Deals",
-    url: "/dashboard/deals",
-    icon: "briefcase",
-    shortcut: ["d", "e"],
+    title: "Campaigns",
+    url: "/dashboard/campaigns",
+    icon: "megaphone",
+    shortcut: ["c", "m"],
     isActive: false,
     items: [],
   },
@@ -207,22 +219,6 @@ export const adminNavItems: NavItem[] = [
     items: [],
   },
   {
-    title: "Campaigns",
-    url: "/dashboard/campaigns",
-    icon: "megaphone",
-    shortcut: ["c", "m"],
-    isActive: false,
-    items: [],
-  },
-  {
-    title: "Courses",
-    url: "/dashboard/courses",
-    icon: "graduationCap",
-    shortcut: ["c", "o"],
-    isActive: false,
-    items: [],
-  },
-  {
     title: "Team",
     url: "/dashboard/team",
     icon: "usersGroup",
@@ -231,10 +227,32 @@ export const adminNavItems: NavItem[] = [
     items: [],
   },
   {
-    title: "Reports",
-    url: "/dashboard/reports",
-    icon: "barChart",
-    shortcut: ["r", "r"],
+    title: "Integrations",
+    url: "/dashboard/integrations",
+    icon: "plug",
+    shortcut: ["i", "n"],
+    isActive: false,
+    items: [],
+  },
+  {
+    title: "Workspace Setting",
+    url: "#",
+    icon: "settings",
+    isActive: true,
+    items: [
+      {
+        title: "Edit Lead Fields",
+        url: "/dashboard/workspace-settings",
+        icon: "settings",
+        shortcut: ["w", "s"],
+      },
+    ],
+  },
+  {
+    title: "WhatsApp Triggers",
+    url: "/dashboard/whatsapp-triggers",
+    icon: "message",
+    shortcut: ["w", "t"],
     isActive: false,
     items: [],
   },
@@ -268,7 +286,7 @@ export const adminNavItems: NavItem[] = [
 
 // Helper function to get navigation items based on role
 export function getNavItemsByRole(
-  role: "AGENT" | "MANAGER" | "ADMIN" | "VIEWER",
+  role: "AGENT" | "MANAGER" | "ADMIN" | "VIEWER" | "SUPER_ADMIN" | string,
 ): NavItem[] {
   switch (role) {
     case "AGENT":
@@ -277,6 +295,7 @@ export function getNavItemsByRole(
     case "MANAGER":
       return managerNavItems;
     case "ADMIN":
+    case "SUPER_ADMIN":
       return adminNavItems;
     default:
       return agentNavItems;

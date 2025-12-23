@@ -1,20 +1,28 @@
-import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedWorkspaceProcedure,
+} from "@/server/api/trpc";
 
 export const dashboardRouter = createTRPCRouter({
   // Get dashboard stats
-  getStats: protectedProcedure.query(async ({ ctx }) => {
+  getStats: protectedWorkspaceProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id;
-    const userRole = ctx.session.user.role;
+    const workspaceId = ctx.workspaceId;
+    const workspaceMember = ctx.workspaceMember;
+    const isSuperAdmin = ctx.session.user.role === "SUPER_ADMIN";
+
+    const isAdminOrManager =
+      isSuperAdmin ||
+      (workspaceMember && ["ADMIN", "MANAGER"].includes(workspaceMember.role));
 
     // For admin/manager, get all stats; for agents, get their own
-    const ownedFilter =
-      userRole === "ADMIN" || userRole === "MANAGER"
-        ? {}
-        : { ownerId: userId };
-    const userFilter =
-      userRole === "ADMIN" || userRole === "MANAGER"
-        ? {}
-        : { userId };
+    const ownedFilter = isAdminOrManager
+      ? { workspaceId }
+      : { ownerId: userId, workspaceId };
+    const userFilter = isAdminOrManager
+      ? { workspaceId }
+      : { userId, workspaceId };
+    const taskFilter = { assigneeId: userId, workspaceId }; // Tasks are always personal? Or admins see all? Original code was personal.
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -37,10 +45,8 @@ export const dashboardRouter = createTRPCRouter({
       // Call stats
       callsToday,
 
-      // Deal stats
-      totalDeals,
-      pipelineValue,
-      closedWonThisMonth,
+      // Converted leads this month
+      convertedLeadsThisMonth,
     ] = await Promise.all([
       ctx.db.lead.count({ where: ownedFilter }),
       ctx.db.lead.count({
@@ -62,13 +68,13 @@ export const dashboardRouter = createTRPCRouter({
       // Tasks
       ctx.db.task.count({
         where: {
-          assigneeId: userId,
+          ...taskFilter,
           status: { in: ["PENDING", "IN_PROGRESS"] },
         },
       }),
       ctx.db.task.count({
         where: {
-          assigneeId: userId,
+          ...taskFilter,
           status: { not: "COMPLETED" },
           dueDate: { lt: today },
         },
@@ -79,22 +85,13 @@ export const dashboardRouter = createTRPCRouter({
         where: { ...userFilter, startedAt: { gte: today } },
       }),
 
-      // Deals
-      ctx.db.deal.count({ where: ownedFilter }),
-      ctx.db.deal.aggregate({
+      // Converted Leads
+      ctx.db.lead.count({
         where: {
           ...ownedFilter,
-          stage: { notIn: ["CLOSED_WON", "CLOSED_LOST"] },
+          status: "CONVERTED",
+          convertedAt: { gte: thisMonth },
         },
-        _sum: { amount: true },
-      }),
-      ctx.db.deal.aggregate({
-        where: {
-          ...ownedFilter,
-          stage: "CLOSED_WON",
-          actualCloseDate: { gte: thisMonth },
-        },
-        _sum: { amount: true },
       }),
     ]);
 
@@ -104,6 +101,7 @@ export const dashboardRouter = createTRPCRouter({
         newToday: newLeadsToday,
         newThisMonth: newLeadsThisMonth,
         followUpsToday,
+        convertedThisMonth: convertedLeadsThisMonth,
       },
       tasks: {
         pending: pendingTasks,
@@ -112,17 +110,13 @@ export const dashboardRouter = createTRPCRouter({
       calls: {
         today: callsToday,
       },
-      deals: {
-        total: totalDeals,
-        pipelineValue: pipelineValue._sum.amount ?? 0,
-        closedWonThisMonth: closedWonThisMonth._sum.amount ?? 0,
-      },
     };
   }),
 
   // Get recent activities
-  getRecentActivities: protectedProcedure.query(async ({ ctx }) => {
+  getRecentActivities: protectedWorkspaceProcedure.query(async ({ ctx }) => {
     const activities = await ctx.db.activity.findMany({
+      where: { workspaceId: ctx.workspaceId },
       take: 20,
       orderBy: { createdAt: "desc" },
       include: {
@@ -139,99 +133,78 @@ export const dashboardRouter = createTRPCRouter({
   }),
 
   // Get lead status distribution
-  getLeadStatusDistribution: protectedProcedure.query(async ({ ctx }) => {
-    const statuses = [
-      "NEW",
-      "CONTACTED",
-      "INTERESTED",
-      "QUALIFIED",
-      "NEGOTIATION",
-      "CONVERTED",
-      "LOST",
-    ];
+  getLeadStatusDistribution: protectedWorkspaceProcedure.query(
+    async ({ ctx }) => {
+      const statuses = [
+        "NEW",
+        "CONTACTED",
+        "INTERESTED",
+        "QUALIFIED",
+        "NEGOTIATION",
+        "CONVERTED",
+        "LOST",
+      ];
 
-    const distribution = await Promise.all(
-      statuses.map(async (status) => {
-        const count = await ctx.db.lead.count({
-          where: { status: status as never },
-        });
-        return { status, count };
-      }),
-    );
+      const distribution = await Promise.all(
+        statuses.map(async (status) => {
+          const count = await ctx.db.lead.count({
+            where: { status: status as never, workspaceId: ctx.workspaceId },
+          });
+          return { status, count };
+        }),
+      );
 
-    return distribution;
-  }),
-
-  // Get deal stage distribution
-  getDealStageDistribution: protectedProcedure.query(async ({ ctx }) => {
-    const stages = [
-      "QUALIFICATION",
-      "NEEDS_ANALYSIS",
-      "PROPOSAL",
-      "NEGOTIATION",
-      "CLOSED_WON",
-      "CLOSED_LOST",
-    ];
-
-    const distribution = await Promise.all(
-      stages.map(async (stage) => {
-        const result = await ctx.db.deal.aggregate({
-          where: { stage: stage as never },
-          _count: true,
-          _sum: { amount: true },
-        });
-        return {
-          stage,
-          count: result._count,
-          value: result._sum.amount ?? 0,
-        };
-      }),
-    );
-
-    return distribution;
-  }),
+      return distribution;
+    },
+  ),
 
   // Get lead source distribution
-  getLeadSourceDistribution: protectedProcedure.query(async ({ ctx }) => {
-    const sources = [
-      "WEBSITE",
-      "FACEBOOK",
-      "INSTAGRAM",
-      "GOOGLE_ADS",
-      "LINKEDIN",
-      "REFERRAL",
-      "WALK_IN",
-      "PHONE_INQUIRY",
-      "WHATSAPP",
-      "OTHER",
-    ];
+  getLeadSourceDistribution: protectedWorkspaceProcedure.query(
+    async ({ ctx }) => {
+      const sources = [
+        "WEBSITE",
+        "FACEBOOK",
+        "INSTAGRAM",
+        "GOOGLE_ADS",
+        "LINKEDIN",
+        "REFERRAL",
+        "WALK_IN",
+        "PHONE_INQUIRY",
+        "WHATSAPP",
+        "OTHER",
+      ];
 
-    const distribution = await Promise.all(
-      sources.map(async (source) => {
-        const count = await ctx.db.lead.count({
-          where: { source: source as never },
-        });
-        return { source, count };
-      }),
-    );
+      const distribution = await Promise.all(
+        sources.map(async (source) => {
+          const count = await ctx.db.lead.count({
+            where: { source: source as never, workspaceId: ctx.workspaceId },
+          });
+          return { source, count };
+        }),
+      );
 
-    // Filter out sources with 0 count
-    return distribution.filter((d) => d.count > 0);
-  }),
+      // Filter out sources with 0 count
+      return distribution.filter((d) => d.count > 0);
+    },
+  ),
 
   // Get top performers (admin/manager only)
-  getTopPerformers: protectedProcedure.query(async ({ ctx }) => {
+  getTopPerformers: protectedWorkspaceProcedure.query(async ({ ctx }) => {
     const users = await ctx.db.user.findMany({
-      where: { role: { in: ["AGENT", "MANAGER"] } },
+      where: {
+        role: { in: ["AGENT", "MANAGER"] },
+        workspaces: { some: { workspaceId: ctx.workspaceId } },
+      },
       select: {
         id: true,
         name: true,
         image: true,
         _count: {
           select: {
-            ownedLeads: { where: { status: "CONVERTED" } },
-            deals: { where: { stage: "CLOSED_WON" } },
-            calls: true,
+            ownedLeads: {
+              where: { status: "CONVERTED", workspaceId: ctx.workspaceId },
+            },
+            calls: { where: { workspaceId: ctx.workspaceId } },
           },
         },
       },
@@ -244,7 +217,6 @@ export const dashboardRouter = createTRPCRouter({
         name: user.name,
         image: user.image,
         conversions: user._count.ownedLeads,
-        wonDeals: user._count.deals,
         calls: user._count.calls,
       }))
       .sort((a, b) => b.conversions - a.conversions);
@@ -253,9 +225,10 @@ export const dashboardRouter = createTRPCRouter({
   }),
 
   // Get upcoming follow-ups
-  getUpcomingFollowUps: protectedProcedure.query(async ({ ctx }) => {
+  getUpcomingFollowUps: protectedWorkspaceProcedure.query(async ({ ctx }) => {
     const leads = await ctx.db.lead.findMany({
       where: {
+        workspaceId: ctx.workspaceId,
         nextFollowUp: { gte: new Date() },
         status: { notIn: ["CONVERTED", "LOST", "DO_NOT_CONTACT"] },
       },

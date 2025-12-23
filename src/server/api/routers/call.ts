@@ -1,9 +1,13 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedWorkspaceProcedure,
+} from "@/server/api/trpc";
+import { TRPCError } from "@trpc/server";
 
-export const callRouter = createTRPCRouter({
+export const callLogRouter = createTRPCRouter({
   // Get all calls
-  getAll: protectedProcedure
+  getAll: protectedWorkspaceProcedure
     .input(
       z.object({
         leadId: z.string().optional(),
@@ -18,6 +22,7 @@ export const callRouter = createTRPCRouter({
       const skip = (page - 1) * limit;
 
       const where = {
+        workspaceId: ctx.workspaceId,
         ...(leadId && { leadId }),
         ...(userId && { userId }),
         ...(outcome && { outcome: outcome as never }),
@@ -34,7 +39,12 @@ export const callRouter = createTRPCRouter({
               select: { id: true, name: true, image: true },
             },
             lead: {
-              select: { id: true, firstName: true, lastName: true, phone: true },
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+              },
             },
           },
         }),
@@ -50,11 +60,14 @@ export const callRouter = createTRPCRouter({
     }),
 
   // Get my recent calls
-  getMyRecent: protectedProcedure
+  getMyRecent: protectedWorkspaceProcedure
     .input(z.object({ limit: z.number().default(10) }))
     .query(async ({ ctx, input }) => {
       const calls = await ctx.db.call.findMany({
-        where: { userId: ctx.session.user.id },
+        where: {
+          userId: ctx.session.user.id,
+          workspaceId: ctx.workspaceId,
+        },
         take: input.limit,
         orderBy: { startedAt: "desc" },
         include: {
@@ -68,7 +81,7 @@ export const callRouter = createTRPCRouter({
     }),
 
   // Log a call
-  create: protectedProcedure
+  create: protectedWorkspaceProcedure
     .input(
       z.object({
         leadId: z.string(),
@@ -83,6 +96,20 @@ export const callRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const lead = await ctx.db.lead.findFirst({
+        where: {
+          id: input.leadId,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!lead) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Lead not found or you don't have access",
+        });
+      }
+
       const call = await ctx.db.call.create({
         data: {
           leadId: input.leadId,
@@ -94,6 +121,7 @@ export const callRouter = createTRPCRouter({
           fromNumber: input.fromNumber,
           notes: input.notes,
           outcome: input.outcome as never,
+          workspaceId: ctx.workspaceId,
           nextFollowUp: input.nextFollowUp,
           endedAt: input.duration ? new Date() : null,
         },
@@ -107,6 +135,7 @@ export const callRouter = createTRPCRouter({
           description: input.notes ?? `${input.type} call to ${input.toNumber}`,
           leadId: input.leadId,
           userId: ctx.session.user.id,
+          workspaceId: ctx.workspaceId,
         },
       });
 
@@ -123,7 +152,7 @@ export const callRouter = createTRPCRouter({
     }),
 
   // Update call
-  update: protectedProcedure
+  update: protectedWorkspaceProcedure
     .input(
       z.object({
         id: z.string(),
@@ -135,6 +164,17 @@ export const callRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
+
+      const existingCall = await ctx.db.call.findFirst({
+        where: { id, workspaceId: ctx.workspaceId },
+      });
+
+      if (!existingCall) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Call not found or you don't have access",
+        });
+      }
 
       const call = await ctx.db.call.update({
         where: { id },
@@ -148,7 +188,7 @@ export const callRouter = createTRPCRouter({
     }),
 
   // Get call stats
-  getStats: protectedProcedure
+  getStats: protectedWorkspaceProcedure
     .input(
       z.object({
         startDate: z.date().optional(),
@@ -157,7 +197,7 @@ export const callRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const { startDate, endDate } = input;
-      
+
       const dateFilter = {
         ...(startDate && { gte: startDate }),
         ...(endDate && { lte: endDate }),
@@ -165,6 +205,7 @@ export const callRouter = createTRPCRouter({
 
       const where = {
         userId: ctx.session.user.id,
+        workspaceId: ctx.workspaceId,
         ...(Object.keys(dateFilter).length > 0 && { startedAt: dateFilter }),
       };
 
@@ -195,7 +236,7 @@ export const callRouter = createTRPCRouter({
     }),
 
   // Get today's call stats for dashboard
-  getTodayStats: protectedProcedure.query(async ({ ctx }) => {
+  getTodayStats: protectedWorkspaceProcedure.query(async ({ ctx }) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -203,12 +244,14 @@ export const callRouter = createTRPCRouter({
       ctx.db.call.count({
         where: {
           userId: ctx.session.user.id,
+          workspaceId: ctx.workspaceId,
           startedAt: { gte: today },
         },
       }),
       ctx.db.call.count({
         where: {
           userId: ctx.session.user.id,
+          workspaceId: ctx.workspaceId,
           startedAt: { gte: today },
           status: "COMPLETED",
         },

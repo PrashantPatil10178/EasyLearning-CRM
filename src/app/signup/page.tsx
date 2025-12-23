@@ -16,14 +16,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import {
-  Brain,
-  ChevronLeft,
-  Eye,
-  EyeOff,
-  Loader2,
-  Sparkles,
-} from "lucide-react";
+import { ChevronLeft, Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
+import Image from "next/image";
 
 export default function SignUpPage() {
   const [email, setEmail] = useState("");
@@ -76,14 +70,20 @@ export default function SignUpPage() {
       <div className="animate-in fade-in slide-in-from-bottom-8 z-10 w-full max-w-md duration-500">
         <Card className="border-white/10 bg-white/60 shadow-2xl backdrop-blur-xl dark:bg-black/40">
           <CardHeader className="space-y-3 text-center">
-            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 shadow-lg shadow-purple-500/20">
-              <Brain className="h-6 w-6 text-white" />
+            <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center">
+              <Image
+                src="/logo.png"
+                alt="EasyLearning"
+                width={64}
+                height={64}
+                className="h-16 w-16 object-contain"
+              />
             </div>
             <CardTitle className="text-2xl font-bold tracking-tight">
               Create your account
             </CardTitle>
             <CardDescription className="text-base">
-              Start your journey to engineering excellence
+              Join EasyLearning to manage your leads and grow your business
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

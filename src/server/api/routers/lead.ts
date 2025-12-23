@@ -1,10 +1,13 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedWorkspaceProcedure,
+} from "@/server/api/trpc";
 import { TRPCError } from "@trpc/server";
 
 export const leadRouter = createTRPCRouter({
   // Get all leads with filters
-  getAll: protectedProcedure
+  getAll: protectedWorkspaceProcedure
     .input(
       z.object({
         status: z.string().optional(),
@@ -20,10 +23,18 @@ export const leadRouter = createTRPCRouter({
       const { status, source, ownerId, priority, search, page, limit } = input;
       const skip = (page - 1) * limit;
 
+      // Check user role - AGENT and VIEWER can only see their own leads
+      const userRole = ctx.session.user.role;
+      const isRestrictedUser = ["AGENT", "VIEWER"].includes(userRole);
+
       const where = {
+        workspaceId: ctx.workspaceId,
+        // If user is AGENT or VIEWER, only show leads assigned to them
+        ...(isRestrictedUser && { ownerId: ctx.session.user.id }),
+        // If ownerId filter is provided and user is admin/manager, apply it
+        ...(!isRestrictedUser && ownerId && { ownerId }),
         ...(status && { status: status as never }),
         ...(source && { source: source as never }),
-        ...(ownerId && { ownerId }),
         ...(priority && { priority: priority as never }),
         ...(search && {
           OR: [
@@ -59,11 +70,14 @@ export const leadRouter = createTRPCRouter({
     }),
 
   // Get single lead by ID
-  getById: protectedProcedure
+  getById: protectedWorkspaceProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const lead = await ctx.db.lead.findUnique({
-        where: { id: input.id },
+        where: {
+          id: input.id,
+          workspaceId: ctx.workspaceId,
+        },
         include: {
           owner: {
             select: { id: true, name: true, email: true, image: true },
@@ -94,6 +108,11 @@ export const leadRouter = createTRPCRouter({
             orderBy: { startedAt: "desc" },
             take: 10,
           },
+          campaignLeads: {
+            include: {
+              campaign: true,
+            },
+          },
         },
       });
 
@@ -104,11 +123,22 @@ export const leadRouter = createTRPCRouter({
         });
       }
 
+      // Check access - AGENT and VIEWER can only view their own leads
+      const userRole = ctx.session.user.role;
+      const isRestrictedUser = ["AGENT", "VIEWER"].includes(userRole);
+      
+      if (isRestrictedUser && lead.ownerId !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have permission to access this lead",
+        });
+      }
+
       return lead;
     }),
 
   // Create new lead
-  create: protectedProcedure
+  create: protectedWorkspaceProcedure
     .input(
       z.object({
         firstName: z.string().min(1),
@@ -119,28 +149,30 @@ export const leadRouter = createTRPCRouter({
         source: z.string().default("WEBSITE"),
         status: z.string().default("NEW"),
         priority: z.string().default("MEDIUM"),
-        courseInterested: z.string().optional(),
-        courseLevel: z.string().optional(),
-        preferredBatch: z.string().optional(),
-        budget: z.number().optional(),
-        city: z.string().optional(),
-        state: z.string().optional(),
-        country: z.string().optional(),
-        pincode: z.string().optional(),
-        address: z.string().optional(),
         ownerId: z.string().optional(),
-        nextFollowUp: z.date().optional(),
-        tags: z.string().optional(),
+        nextFollowUp: z.string().optional(),
+        campaign: z.string().optional(),
+        customFields: z.string().optional(), // JSON string for dynamic fields
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const lead = await ctx.db.lead.create({
         data: {
-          ...input,
+          firstName: input.firstName,
+          lastName: input.lastName,
           email: input.email || null,
+          phone: input.phone,
+          altPhone: input.altPhone,
           source: input.source as never,
           status: input.status as never,
           priority: input.priority as never,
+          ownerId: input.ownerId || null,
+          nextFollowUp: input.nextFollowUp
+            ? new Date(input.nextFollowUp)
+            : null,
+          campaign: input.campaign || null,
+          customFields: input.customFields,
+          workspaceId: ctx.workspaceId,
           createdById: ctx.session.user.id,
         },
       });
@@ -160,7 +192,7 @@ export const leadRouter = createTRPCRouter({
     }),
 
   // Update lead
-  update: protectedProcedure
+  update: protectedWorkspaceProcedure
     .input(
       z.object({
         id: z.string(),
@@ -184,13 +216,38 @@ export const leadRouter = createTRPCRouter({
         ownerId: z.string().optional(),
         nextFollowUp: z.date().optional(),
         tags: z.string().optional(),
+        campaign: z.string().optional(),
+        customFields: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
 
-      // Get current lead to check for status change
-      const currentLead = await ctx.db.lead.findUnique({ where: { id } });
+      // Get current lead to check for status change and workspace access
+      const currentLead = await ctx.db.lead.findFirst({
+        where: {
+          id,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!currentLead) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Lead not found or you don't have access",
+        });
+      }
+
+      // Check access - AGENT and VIEWER can only update their own leads
+      const userRole = ctx.session.user.role;
+      const isRestrictedUser = ["AGENT", "VIEWER"].includes(userRole);
+      
+      if (isRestrictedUser && currentLead.ownerId !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have permission to update this lead",
+        });
+      }
 
       const lead = await ctx.db.lead.update({
         where: { id },
@@ -213,6 +270,7 @@ export const leadRouter = createTRPCRouter({
             description: `Status changed from ${currentLead.status} to ${data.status}`,
             leadId: lead.id,
             userId: ctx.session.user.id,
+            workspaceId: ctx.workspaceId,
           },
         });
       }
@@ -221,15 +279,37 @@ export const leadRouter = createTRPCRouter({
     }),
 
   // Delete lead
-  delete: protectedProcedure
+  delete: protectedWorkspaceProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      const lead = await ctx.db.lead.findFirst({
+        where: { id: input.id, workspaceId: ctx.workspaceId },
+      });
+
+      if (!lead) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Lead not found or you don't have access",
+        });
+      }
+
+      // Check access - AGENT and VIEWER can only delete their own leads
+      const userRole = ctx.session.user.role;
+      const isRestrictedUser = ["AGENT", "VIEWER"].includes(userRole);
+      
+      if (isRestrictedUser && lead.ownerId !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have permission to delete this lead",
+        });
+      }
+
       await ctx.db.lead.delete({ where: { id: input.id } });
       return { success: true };
     }),
 
   // Assign lead to user
-  assign: protectedProcedure
+  assign: protectedWorkspaceProcedure
     .input(
       z.object({
         leadId: z.string(),
@@ -237,7 +317,21 @@ export const leadRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const lead = await ctx.db.lead.update({
+      const lead = await ctx.db.lead.findFirst({
+        where: {
+          id: input.leadId,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!lead) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Lead not found or you don't have access",
+        });
+      }
+
+      const updatedLead = await ctx.db.lead.update({
         where: { id: input.leadId },
         data: { ownerId: input.ownerId },
       });
@@ -247,91 +341,253 @@ export const leadRouter = createTRPCRouter({
           type: "LEAD_ASSIGNED",
           subject: "Lead assigned",
           description: `Lead assigned to new owner`,
-          leadId: lead.id,
+          leadId: updatedLead.id,
           userId: ctx.session.user.id,
+          workspaceId: ctx.workspaceId,
         },
       });
 
-      return lead;
+      return updatedLead;
     }),
 
-  // Convert lead to deal
-  convert: protectedProcedure
+  // Bulk assign leads
+  bulkAssign: protectedWorkspaceProcedure
     .input(
       z.object({
-        leadId: z.string(),
-        dealName: z.string(),
-        amount: z.number(),
-        courseName: z.string().optional(),
-        courseDuration: z.string().optional(),
-        expectedCloseDate: z.date().optional(),
+        leadIds: z.array(z.string()),
+        ownerId: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { leadId, ...dealData } = input;
+      const { leadIds, ownerId } = input;
 
-      // Update lead as converted
-      await ctx.db.lead.update({
-        where: { id: leadId },
-        data: {
-          isConverted: true,
-          convertedAt: new Date(),
-          status: "CONVERTED",
-        },
+      // Verify owner exists
+      const owner = await ctx.db.user.findUnique({
+        where: { id: ownerId },
       });
 
-      // Create deal
-      const deal = await ctx.db.deal.create({
-        data: {
-          name: dealData.dealName,
-          amount: dealData.amount,
-          courseName: dealData.courseName,
-          courseDuration: dealData.courseDuration,
-          expectedCloseDate: dealData.expectedCloseDate,
-          leadId,
-          ownerId: ctx.session.user.id,
-          createdById: ctx.session.user.id,
+      if (!owner) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Owner not found",
+        });
+      }
+
+      // Update leads
+      await ctx.db.lead.updateMany({
+        where: {
+          id: { in: leadIds },
+          workspaceId: ctx.workspaceId,
         },
+        data: { ownerId },
       });
 
-      // Create activity
-      await ctx.db.activity.create({
-        data: {
-          type: "DEAL_CREATED",
-          subject: "Lead converted to deal",
-          description: `Lead converted to deal: ${dealData.dealName}`,
+      // Create activities
+      await ctx.db.activity.createMany({
+        data: leadIds.map((leadId) => ({
+          type: "LEAD_ASSIGNED",
+          subject: "Lead assigned",
+          description: `Lead assigned to ${owner.name}`,
           leadId,
           userId: ctx.session.user.id,
+          workspaceId: ctx.workspaceId,
+        })),
+      });
+
+      return { success: true };
+    }),
+
+  // Bulk update leads
+  bulkUpdate: protectedWorkspaceProcedure
+    .input(
+      z.object({
+        leadIds: z.array(z.string()),
+        data: z.object({
+          status: z.string().optional(),
+          priority: z.string().optional(),
+          source: z.string().optional(),
+          tags: z.string().optional(),
+        }),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { leadIds, data } = input;
+
+      await ctx.db.lead.updateMany({
+        where: {
+          id: { in: leadIds },
+          workspaceId: ctx.workspaceId,
+        },
+        data: data as never,
+      });
+
+      return { success: true, count: leadIds.length };
+    }),
+
+  // Bulk delete leads
+  bulkDelete: protectedWorkspaceProcedure
+    .input(z.object({ leadIds: z.array(z.string()) }))
+    .mutation(async ({ ctx, input }) => {
+      const { leadIds } = input;
+
+      await ctx.db.lead.deleteMany({
+        where: {
+          id: { in: leadIds },
+          workspaceId: ctx.workspaceId,
         },
       });
 
-      return deal;
+      return { success: true, count: leadIds.length };
+    }),
+
+  // Import leads from CSV
+  importFromCSV: protectedWorkspaceProcedure
+    .input(
+      z.object({
+        leads: z.array(
+          z.object({
+            firstName: z.string(),
+            lastName: z.string().optional(),
+            email: z.string().email().optional(),
+            phone: z.string(),
+            altPhone: z.string().optional(),
+            source: z.string().optional(),
+            status: z.string().optional(),
+            priority: z.string().optional(),
+            courseInterested: z.string().optional(),
+            city: z.string().optional(),
+            state: z.string().optional(),
+            tags: z.string().optional(),
+            campaign: z.string().optional(),
+            nextFollowUp: z.string().optional(),
+            customFields: z.string().optional(),
+          }),
+        ),
+        assignToMe: z.boolean().default(false),
+        autoAssign: z.boolean().default(false),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { leads, assignToMe, autoAssign } = input;
+      const userId = ctx.session.user.id;
+
+      const createdLeads = await Promise.all(
+        leads.map((lead) =>
+          ctx.db.lead.create({
+            data: {
+              ...lead,
+              source: (lead.source || "OTHER") as never,
+              status: (lead.status || "NEW") as never,
+              priority: (lead.priority || "MEDIUM") as never,
+              campaign: lead.campaign || null,
+              nextFollowUp: lead.nextFollowUp
+                ? new Date(lead.nextFollowUp)
+                : null,
+              customFields: lead.customFields || null,
+              createdById: userId,
+              workspaceId: ctx.workspaceId,
+              ...(assignToMe && {
+                ownerId: userId,
+                assignedAt: new Date(),
+                assignedBy: userId,
+              }),
+            },
+          }),
+        ),
+      );
+
+      return { success: true, count: createdLeads.length };
+    }),
+
+  // Export leads to CSV
+  exportToCSV: protectedWorkspaceProcedure
+    .input(
+      z.object({
+        status: z.string().optional(),
+        source: z.string().optional(),
+        ownerId: z.string().optional(),
+        priority: z.string().optional(),
+        search: z.string().optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const { status, source, ownerId, priority, search } = input;
+
+      const where = {
+        workspaceId: ctx.workspaceId,
+        ...(status && { status: status as never }),
+        ...(source && { source: source as never }),
+        ...(ownerId && { ownerId }),
+        ...(priority && { priority: priority as never }),
+        ...(search && {
+          OR: [
+            { firstName: { contains: search } },
+            { lastName: { contains: search } },
+            { email: { contains: search } },
+            { phone: { contains: search } },
+          ],
+        }),
+      };
+
+      const leads = await ctx.db.lead.findMany({
+        where,
+        include: {
+          owner: {
+            select: { name: true, email: true },
+          },
+        },
+      });
+
+      return leads.map((lead) => ({
+        firstName: lead.firstName,
+        lastName: lead.lastName || "",
+        email: lead.email || "",
+        phone: lead.phone,
+        altPhone: lead.altPhone || "",
+        source: lead.source,
+        status: lead.status,
+        priority: lead.priority,
+        courseInterested: lead.courseInterested || "",
+        city: lead.city || "",
+        state: lead.state || "",
+        country: lead.country || "",
+        tags: lead.tags || "",
+        owner: lead.owner?.name || "",
+        ownerEmail: lead.owner?.email || "",
+        createdAt: lead.createdAt.toISOString(),
+      }));
     }),
 
   // Get lead stats
-  getStats: protectedProcedure.query(async ({ ctx }) => {
-    const [
-      total,
-      newLeads,
-      contacted,
-      qualified,
-      converted,
-      todayFollowUps,
-    ] = await Promise.all([
-      ctx.db.lead.count(),
-      ctx.db.lead.count({ where: { status: "NEW" } }),
-      ctx.db.lead.count({ where: { status: "CONTACTED" } }),
-      ctx.db.lead.count({ where: { status: "QUALIFIED" } }),
-      ctx.db.lead.count({ where: { status: "CONVERTED" } }),
-      ctx.db.lead.count({
-        where: {
-          nextFollowUp: {
-            gte: new Date(new Date().setHours(0, 0, 0, 0)),
-            lt: new Date(new Date().setHours(23, 59, 59, 999)),
+  getStats: protectedWorkspaceProcedure.query(async ({ ctx }) => {
+    const workspaceId = ctx.workspaceId;
+    
+    // Check user role - AGENT and VIEWER can only see their own lead stats
+    const userRole = ctx.session.user.role;
+    const isRestrictedUser = ["AGENT", "VIEWER"].includes(userRole);
+    
+    const whereCondition = {
+      workspaceId,
+      ...(isRestrictedUser && { ownerId: ctx.session.user.id }),
+    };
+
+    const [total, newLeads, contacted, qualified, converted, todayFollowUps] =
+      await Promise.all([
+        ctx.db.lead.count({ where: whereCondition }),
+        ctx.db.lead.count({ where: { ...whereCondition, status: "NEW" } }),
+        ctx.db.lead.count({ where: { ...whereCondition, status: "CONTACTED" } }),
+        ctx.db.lead.count({ where: { ...whereCondition, status: "QUALIFIED" } }),
+        ctx.db.lead.count({ where: { ...whereCondition, status: "CONVERTED" } }),
+        ctx.db.lead.count({
+          where: {
+            ...whereCondition,
+            nextFollowUp: {
+              gte: new Date(new Date().setHours(0, 0, 0, 0)),
+              lt: new Date(new Date().setHours(23, 59, 59, 999)),
+            },
           },
-        },
-      }),
-    ]);
+        }),
+      ]);
 
     return {
       total,
@@ -343,4 +599,90 @@ export const leadRouter = createTRPCRouter({
       conversionRate: total > 0 ? ((converted / total) * 100).toFixed(1) : "0",
     };
   }),
+
+  // Update lead status
+  updateStatus: protectedWorkspaceProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        status: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const currentLead = await ctx.db.lead.findFirst({
+        where: { id: input.id, workspaceId: ctx.workspaceId },
+      });
+
+      if (!currentLead) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Lead not found or you don't have access",
+        });
+      }
+
+      const lead = await ctx.db.lead.update({
+        where: { id: input.id },
+        data: {
+          status: input.status as never,
+          ...(input.status === "CONVERTED" && { convertedAt: new Date() }),
+        },
+      });
+
+      // Log activity
+      await ctx.db.activity.create({
+        data: {
+          type: "STATUS_CHANGE",
+          subject: "Status updated",
+          description: `Status changed from ${currentLead.status} to ${input.status}`,
+          leadId: input.id,
+          userId: ctx.session.user.id,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      return lead;
+    }),
+
+  // Quick save revenue and feedback
+  quickSave: protectedWorkspaceProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        revenue: z.number().optional(),
+        feedbackNeeded: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+
+      const existingLead = await ctx.db.lead.findFirst({
+        where: { id, workspaceId: ctx.workspaceId },
+      });
+
+      if (!existingLead) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Lead not found or you don't have access",
+        });
+      }
+
+      const lead = await ctx.db.lead.update({
+        where: { id },
+        data,
+      });
+
+      // Log activity
+      await ctx.db.activity.create({
+        data: {
+          leadId: id,
+          userId: ctx.session.user.id,
+          type: "EDIT",
+          subject: "Quick fields updated",
+          message: "Quick fields updated (revenue/feedback)",
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      return lead;
+    }),
 });

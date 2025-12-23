@@ -1,24 +1,33 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure, adminProcedure } from "@/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedWorkspaceProcedure,
+  adminWorkspaceProcedure,
+} from "@/server/api/trpc";
 
 export const campaignRouter = createTRPCRouter({
   // Get all campaigns
-  getAll: protectedProcedure
+  getAll: protectedWorkspaceProcedure
     .input(
       z.object({
         status: z.string().optional(),
         type: z.string().optional(),
+        search: z.string().optional(),
         page: z.number().default(1),
         limit: z.number().default(10),
       }),
     )
     .query(async ({ ctx, input }) => {
-      const { status, type, page, limit } = input;
+      const { status, type, search, page, limit } = input;
       const skip = (page - 1) * limit;
 
       const where = {
+        workspaceId: ctx.workspaceId,
         ...(status && { status: status as never }),
         ...(type && { type: type as never }),
+        ...(search && {
+          name: { contains: search },
+        }),
       };
 
       const [campaigns, total] = await Promise.all([
@@ -48,11 +57,14 @@ export const campaignRouter = createTRPCRouter({
     }),
 
   // Get single campaign
-  getById: protectedProcedure
+  getById: protectedWorkspaceProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const campaign = await ctx.db.campaign.findUnique({
-        where: { id: input.id },
+        where: {
+          id: input.id,
+          workspaceId: ctx.workspaceId,
+        },
         include: {
           createdBy: {
             select: { id: true, name: true, image: true },
@@ -85,7 +97,7 @@ export const campaignRouter = createTRPCRouter({
     }),
 
   // Create campaign
-  create: protectedProcedure
+  create: protectedWorkspaceProcedure
     .input(
       z.object({
         name: z.string().min(1),
@@ -108,6 +120,7 @@ export const campaignRouter = createTRPCRouter({
           budget: input.budget,
           targetAudience: input.targetAudience,
           createdById: ctx.session.user.id,
+          workspaceId: ctx.workspaceId,
         },
       });
 
@@ -124,7 +137,7 @@ export const campaignRouter = createTRPCRouter({
     }),
 
   // Update campaign
-  update: protectedProcedure
+  update: protectedWorkspaceProcedure
     .input(
       z.object({
         id: z.string(),
@@ -142,7 +155,21 @@ export const campaignRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
 
-      const campaign = await ctx.db.campaign.update({
+      const campaign = await ctx.db.campaign.findFirst({
+        where: {
+          id,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!campaign) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Campaign not found or you don't have access",
+        });
+      }
+
+      const updatedCampaign = await ctx.db.campaign.update({
         where: { id },
         data: {
           ...data,
@@ -151,11 +178,11 @@ export const campaignRouter = createTRPCRouter({
         },
       });
 
-      return campaign;
+      return updatedCampaign;
     }),
 
   // Add leads to campaign
-  addLeads: protectedProcedure
+  addLeads: protectedWorkspaceProcedure
     .input(
       z.object({
         campaignId: z.string(),
@@ -165,13 +192,36 @@ export const campaignRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { campaignId, leadIds } = input;
 
-      await ctx.db.campaignLead.createMany({
-        data: leadIds.map((leadId) => ({
-          campaignId,
-          leadId,
-        })),
-        skipDuplicates: true,
+      const campaign = await ctx.db.campaign.findFirst({
+        where: {
+          id: campaignId,
+          workspaceId: ctx.workspaceId,
+        },
       });
+
+      if (!campaign) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Campaign not found or you don't have access",
+        });
+      }
+
+      // Use upsert to handle duplicates (SQLite doesn't support skipDuplicates)
+      let addedCount = 0;
+      for (const leadId of leadIds) {
+        try {
+          await ctx.db.campaignLead.upsert({
+            where: {
+              campaignId_leadId: { campaignId, leadId },
+            },
+            create: { campaignId, leadId },
+            update: {}, // No update needed, just skip if exists
+          });
+          addedCount++;
+        } catch {
+          // Ignore errors for duplicates
+        }
+      }
 
       // Update campaign lead count
       const totalLeads = await ctx.db.campaignLead.count({
@@ -183,11 +233,11 @@ export const campaignRouter = createTRPCRouter({
         data: { totalLeads },
       });
 
-      return { success: true, added: leadIds.length };
+      return { success: true, added: addedCount };
     }),
 
   // Remove lead from campaign
-  removeLead: protectedProcedure
+  removeLead: protectedWorkspaceProcedure
     .input(
       z.object({
         campaignId: z.string(),
@@ -195,6 +245,20 @@ export const campaignRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const campaign = await ctx.db.campaign.findFirst({
+        where: {
+          id: input.campaignId,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!campaign) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Campaign not found or you don't have access",
+        });
+      }
+
       await ctx.db.campaignLead.delete({
         where: {
           campaignId_leadId: {
@@ -208,7 +272,7 @@ export const campaignRouter = createTRPCRouter({
     }),
 
   // Add member to campaign
-  addMember: protectedProcedure
+  addMember: protectedWorkspaceProcedure
     .input(
       z.object({
         campaignId: z.string(),
@@ -217,6 +281,20 @@ export const campaignRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const campaign = await ctx.db.campaign.findFirst({
+        where: {
+          id: input.campaignId,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!campaign) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Campaign not found or you don't have access",
+        });
+      }
+
       const member = await ctx.db.campaignMember.create({
         data: {
           campaignId: input.campaignId,
@@ -229,28 +307,45 @@ export const campaignRouter = createTRPCRouter({
     }),
 
   // Delete campaign
-  delete: adminProcedure
+  delete: adminWorkspaceProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      const campaign = await ctx.db.campaign.findFirst({
+        where: {
+          id: input.id,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!campaign) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Campaign not found or you don't have access",
+        });
+      }
+
       await ctx.db.campaign.delete({ where: { id: input.id } });
       return { success: true };
     }),
 
   // Get campaign stats
-  getStats: protectedProcedure.query(async ({ ctx }) => {
+  getStats: protectedWorkspaceProcedure.query(async ({ ctx }) => {
+    const workspaceId = ctx.workspaceId;
     const [total, active, draft, completed] = await Promise.all([
-      ctx.db.campaign.count(),
-      ctx.db.campaign.count({ where: { status: "ACTIVE" } }),
-      ctx.db.campaign.count({ where: { status: "DRAFT" } }),
-      ctx.db.campaign.count({ where: { status: "COMPLETED" } }),
+      ctx.db.campaign.count({ where: { workspaceId } }),
+      ctx.db.campaign.count({ where: { status: "ACTIVE", workspaceId } }),
+      ctx.db.campaign.count({ where: { status: "DRAFT", workspaceId } }),
+      ctx.db.campaign.count({ where: { status: "COMPLETED", workspaceId } }),
     ]);
 
     // Get total leads in campaigns
-    const totalCampaignLeads = await ctx.db.campaignLead.count();
+    const totalCampaignLeads = await ctx.db.campaignLead.count({
+      where: { campaign: { workspaceId } },
+    });
 
     // Get converted leads
     const convertedLeads = await ctx.db.campaignLead.count({
-      where: { status: "converted" },
+      where: { status: "converted", campaign: { workspaceId } },
     });
 
     return {

@@ -1,16 +1,28 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure, adminProcedure } from "@/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedWorkspaceProcedure,
+  adminWorkspaceProcedure,
+} from "@/server/api/trpc";
+import { TRPCError } from "@trpc/server";
 
 export const teamRouter = createTRPCRouter({
   // Get all teams
-  getAll: protectedProcedure.query(async ({ ctx }) => {
+  getAll: protectedWorkspaceProcedure.query(async ({ ctx }) => {
     const teams = await ctx.db.team.findMany({
+      where: { workspaceId: ctx.workspaceId },
       include: {
         manager: {
           select: { id: true, name: true, email: true, image: true },
         },
         members: {
-          select: { id: true, name: true, email: true, image: true, role: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+            role: true,
+          },
         },
         _count: {
           select: { members: true },
@@ -23,17 +35,26 @@ export const teamRouter = createTRPCRouter({
   }),
 
   // Get single team
-  getById: protectedProcedure
+  getById: protectedWorkspaceProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const team = await ctx.db.team.findUnique({
-        where: { id: input.id },
+        where: {
+          id: input.id,
+          workspaceId: ctx.workspaceId,
+        },
         include: {
           manager: {
             select: { id: true, name: true, email: true, image: true },
           },
           members: {
-            select: { id: true, name: true, email: true, image: true, role: true },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+              role: true,
+            },
           },
         },
       });
@@ -42,7 +63,7 @@ export const teamRouter = createTRPCRouter({
     }),
 
   // Create team
-  create: adminProcedure
+  create: adminWorkspaceProcedure
     .input(
       z.object({
         name: z.string().min(1),
@@ -56,6 +77,7 @@ export const teamRouter = createTRPCRouter({
           name: input.name,
           description: input.description,
           managerId: input.managerId,
+          workspaceId: ctx.workspaceId,
         },
       });
 
@@ -63,7 +85,7 @@ export const teamRouter = createTRPCRouter({
     }),
 
   // Update team
-  update: adminProcedure
+  update: adminWorkspaceProcedure
     .input(
       z.object({
         id: z.string(),
@@ -75,16 +97,30 @@ export const teamRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
 
-      const team = await ctx.db.team.update({
+      const team = await ctx.db.team.findFirst({
+        where: {
+          id,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!team) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Team not found or you don't have access",
+        });
+      }
+
+      const updatedTeam = await ctx.db.team.update({
         where: { id },
         data,
       });
 
-      return team;
+      return updatedTeam;
     }),
 
   // Add member to team
-  addMember: adminProcedure
+  addMember: adminWorkspaceProcedure
     .input(
       z.object({
         teamId: z.string(),
@@ -92,6 +128,20 @@ export const teamRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const team = await ctx.db.team.findFirst({
+        where: {
+          id: input.teamId,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!team) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Team not found or you don't have access",
+        });
+      }
+
       await ctx.db.user.update({
         where: { id: input.userId },
         data: { teamId: input.teamId },
@@ -101,13 +151,32 @@ export const teamRouter = createTRPCRouter({
     }),
 
   // Remove member from team
-  removeMember: adminProcedure
+  removeMember: adminWorkspaceProcedure
     .input(
       z.object({
         userId: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const user = await ctx.db.user.findUnique({
+        where: { id: input.userId },
+        include: { team: true },
+      });
+
+      if (!user || !user.teamId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found or not in a team",
+        });
+      }
+
+      if (user.team?.workspaceId !== ctx.workspaceId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You cannot manage users from other workspaces",
+        });
+      }
+
       await ctx.db.user.update({
         where: { id: input.userId },
         data: { teamId: null },
@@ -117,31 +186,46 @@ export const teamRouter = createTRPCRouter({
     }),
 
   // Delete team
-  delete: adminProcedure
+  delete: adminWorkspaceProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // Remove all members from team first
-      await ctx.db.user.updateMany({
-        where: { teamId: input.id },
-        data: { teamId: null },
+      const team = await ctx.db.team.findFirst({
+        where: {
+          id: input.id,
+          workspaceId: ctx.workspaceId,
+        },
       });
+
+      if (!team) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Team not found or you don't have access",
+        });
+      }
 
       await ctx.db.team.delete({ where: { id: input.id } });
       return { success: true };
     }),
 
   // Get my team
-  getMyTeam: protectedProcedure.query(async ({ ctx }) => {
+  getMyTeam: protectedWorkspaceProcedure.query(async ({ ctx }) => {
     const user = await ctx.db.user.findUnique({
       where: { id: ctx.session.user.id },
       include: {
         team: {
+          where: { workspaceId: ctx.workspaceId },
           include: {
             manager: {
               select: { id: true, name: true, email: true, image: true },
             },
             members: {
-              select: { id: true, name: true, email: true, image: true, role: true },
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true,
+                role: true,
+              },
             },
           },
         },

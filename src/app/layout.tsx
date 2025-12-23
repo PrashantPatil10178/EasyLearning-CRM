@@ -17,9 +17,8 @@ const META_THEME_COLORS = {
 };
 
 export const metadata: Metadata = {
-  title: "MHT CET Prep - Master MHT CET with AI-Powered Learning",
-  description:
-    "Transform your MHT CET preparation with personalized learning paths, adaptive testing, and real-time performance analytics at mhtcet.app",
+  title: "EasyLearning CRM",
+  description: "",
 };
 
 export const viewport: Viewport = {

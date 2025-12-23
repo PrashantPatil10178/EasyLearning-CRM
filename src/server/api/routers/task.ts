@@ -1,9 +1,13 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedWorkspaceProcedure,
+} from "@/server/api/trpc";
+import { TRPCError } from "@trpc/server";
 
 export const taskRouter = createTRPCRouter({
   // Get all tasks
-  getAll: protectedProcedure
+  getAll: protectedWorkspaceProcedure
     .input(
       z.object({
         status: z.string().optional(),
@@ -19,6 +23,7 @@ export const taskRouter = createTRPCRouter({
       const skip = (page - 1) * limit;
 
       const where = {
+        workspaceId: ctx.workspaceId,
         ...(status && { status: status as never }),
         ...(assigneeId && { assigneeId }),
         ...(priority && { priority: priority as never }),
@@ -36,7 +41,12 @@ export const taskRouter = createTRPCRouter({
               select: { id: true, name: true, email: true, image: true },
             },
             lead: {
-              select: { id: true, firstName: true, lastName: true, phone: true },
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+              },
             },
           },
         }),
@@ -52,7 +62,7 @@ export const taskRouter = createTRPCRouter({
     }),
 
   // Get my tasks
-  getMyTasks: protectedProcedure
+  getMyTasks: protectedWorkspaceProcedure
     .input(
       z.object({
         status: z.string().optional(),
@@ -61,6 +71,7 @@ export const taskRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const tasks = await ctx.db.task.findMany({
         where: {
+          workspaceId: ctx.workspaceId,
           assigneeId: ctx.session.user.id,
           ...(input.status && { status: input.status as never }),
         },
@@ -75,10 +86,26 @@ export const taskRouter = createTRPCRouter({
       return tasks;
     }),
 
+  // Get tasks by lead ID
+  getByLeadId: protectedWorkspaceProcedure
+    .input(z.object({ leadId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const tasks = await ctx.db.task.findMany({
+        where: {
+          leadId: input.leadId,
+          workspaceId: ctx.workspaceId,
+        },
+        orderBy: { dueDate: "desc" },
+        take: 20,
+      });
+      return tasks;
+    }),
+
   // Get overdue tasks
-  getOverdue: protectedProcedure.query(async ({ ctx }) => {
+  getOverdue: protectedWorkspaceProcedure.query(async ({ ctx }) => {
     const tasks = await ctx.db.task.findMany({
       where: {
+        workspaceId: ctx.workspaceId,
         status: { not: "COMPLETED" },
         dueDate: { lt: new Date() },
       },
@@ -97,35 +124,54 @@ export const taskRouter = createTRPCRouter({
   }),
 
   // Create task
-  create: protectedProcedure
+  create: protectedWorkspaceProcedure
     .input(
       z.object({
-        title: z.string().min(1),
+        title: z.string().min(1).optional(),
         description: z.string().optional(),
+        note: z.string().optional(),
         dueDate: z.date().optional(),
+        dueAt: z.date().optional(),
         priority: z.string().default("MEDIUM"),
-        assigneeId: z.string(),
+        assigneeId: z.string().optional(),
         leadId: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const task = await ctx.db.task.create({
         data: {
-          title: input.title,
+          title: input.title ?? "Follow-up task",
           description: input.description,
-          dueDate: input.dueDate,
+          note: input.note,
+          dueDate: input.dueDate ?? input.dueAt,
           priority: input.priority as never,
-          assigneeId: input.assigneeId,
+          assigneeId: input.assigneeId ?? ctx.session.user.id,
           leadId: input.leadId,
           createdById: ctx.session.user.id,
+          status: "UPCOMING",
+          workspaceId: ctx.workspaceId,
         },
       });
+
+      // Log activity if leadId is provided
+      if (input.leadId) {
+        await ctx.db.activity.create({
+          data: {
+            leadId: input.leadId,
+            userId: ctx.session.user.id,
+            type: "FOLLOW_UP_SCHEDULED",
+            subject: "Follow-up created",
+            message: `Follow-up created for ${(input.dueAt ?? input.dueDate)?.toLocaleString()}`,
+            workspaceId: ctx.workspaceId,
+          },
+        });
+      }
 
       return task;
     }),
 
   // Update task
-  update: protectedProcedure
+  update: protectedWorkspaceProcedure
     .input(
       z.object({
         id: z.string(),
@@ -140,7 +186,21 @@ export const taskRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
 
-      const task = await ctx.db.task.update({
+      const task = await ctx.db.task.findFirst({
+        where: {
+          id,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!task) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Task not found or you don't have access",
+        });
+      }
+
+      const updatedTask = await ctx.db.task.update({
         where: { id },
         data: {
           ...data,
@@ -151,26 +211,41 @@ export const taskRouter = createTRPCRouter({
       });
 
       // If task is related to a lead, create activity
-      if (task.leadId && data.status === "COMPLETED") {
+      if (updatedTask.leadId && data.status === "COMPLETED") {
         await ctx.db.activity.create({
           data: {
             type: "TASK_COMPLETED",
             subject: "Task completed",
-            description: `Task "${task.title}" was completed`,
-            leadId: task.leadId,
+            description: `Task "${updatedTask.title}" was completed`,
+            leadId: updatedTask.leadId,
             userId: ctx.session.user.id,
+            workspaceId: ctx.workspaceId,
           },
         });
       }
 
-      return task;
+      return updatedTask;
     }),
 
   // Complete task
-  complete: protectedProcedure
+  complete: protectedWorkspaceProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const task = await ctx.db.task.update({
+      const task = await ctx.db.task.findFirst({
+        where: {
+          id: input.id,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!task) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Task not found or you don't have access",
+        });
+      }
+
+      const updatedTask = await ctx.db.task.update({
         where: { id: input.id },
         data: {
           status: "COMPLETED",
@@ -178,46 +253,69 @@ export const taskRouter = createTRPCRouter({
         },
       });
 
-      if (task.leadId) {
+      if (updatedTask.leadId) {
         await ctx.db.activity.create({
           data: {
             type: "TASK_COMPLETED",
             subject: "Task completed",
-            description: `Task "${task.title}" was completed`,
-            leadId: task.leadId,
+            description: `Task "${updatedTask.title}" was completed`,
+            leadId: updatedTask.leadId,
             userId: ctx.session.user.id,
+            workspaceId: ctx.workspaceId,
           },
         });
       }
 
-      return task;
+      return updatedTask;
     }),
 
   // Delete task
-  delete: protectedProcedure
+  delete: protectedWorkspaceProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      const task = await ctx.db.task.findFirst({
+        where: {
+          id: input.id,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!task) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Task not found or you don't have access",
+        });
+      }
+
       await ctx.db.task.delete({ where: { id: input.id } });
       return { success: true };
     }),
 
   // Get task stats
-  getStats: protectedProcedure.query(async ({ ctx }) => {
+  getStats: protectedWorkspaceProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id;
+    const workspaceId = ctx.workspaceId;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const [total, pending, inProgress, completed, overdue, dueToday] =
       await Promise.all([
-        ctx.db.task.count({ where: { assigneeId: userId } }),
-        ctx.db.task.count({ where: { assigneeId: userId, status: "PENDING" } }),
-        ctx.db.task.count({ where: { assigneeId: userId, status: "IN_PROGRESS" } }),
-        ctx.db.task.count({ where: { assigneeId: userId, status: "COMPLETED" } }),
+        ctx.db.task.count({ where: { assigneeId: userId, workspaceId } }),
+        ctx.db.task.count({
+          where: { assigneeId: userId, status: "PENDING", workspaceId },
+        }),
+        ctx.db.task.count({
+          where: { assigneeId: userId, status: "IN_PROGRESS", workspaceId },
+        }),
+        ctx.db.task.count({
+          where: { assigneeId: userId, status: "COMPLETED", workspaceId },
+        }),
         ctx.db.task.count({
           where: {
             assigneeId: userId,
             status: { not: "COMPLETED" },
-            dueDate: { lt: today },
+            dueDate: { lt: new Date() },
+            workspaceId,
           },
         }),
         ctx.db.task.count({
@@ -228,6 +326,7 @@ export const taskRouter = createTRPCRouter({
               gte: today,
               lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
             },
+            workspaceId,
           },
         }),
       ]);

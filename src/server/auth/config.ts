@@ -1,10 +1,7 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { type DefaultSession, type NextAuthConfig } from "next-auth";
-import DiscordProvider from "next-auth/providers/discord";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
-import { z } from "zod";
 
 import { db } from "@/server/db";
 
@@ -18,12 +15,12 @@ declare module "next-auth" {
   interface Session extends DefaultSession {
     user: {
       id: string;
-      role: "STUDENT" | "ORGANIZATION" | "ADMIN" | "MODERATOR";
+      role: "SUPER_ADMIN" | "ADMIN" | "MANAGER" | "AGENT" | "VIEWER";
     } & DefaultSession["user"];
   }
 
   interface User {
-    role: "STUDENT" | "ORGANIZATION" | "ADMIN" | "MODERATOR";
+    role: "SUPER_ADMIN" | "ADMIN" | "MANAGER" | "AGENT" | "VIEWER";
   }
 }
 
@@ -34,64 +31,123 @@ declare module "next-auth" {
  */
 export const authConfig = {
   providers: [
-    DiscordProvider,
     GoogleProvider,
     CredentialsProvider({
-      name: "Credentials",
+      id: "otp",
+      name: "OTP",
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        phone: { label: "Phone", type: "text" },
+        otp: { label: "OTP", type: "text" },
+        name: { label: "Name", type: "text" },
       },
       async authorize(credentials) {
-        // Validate input
-        const parsedCredentials = z
-          .object({
-            email: z.string().email(),
-            password: z.string().min(6),
-          })
-          .safeParse(credentials);
+        try {
+          const { phone, otp, name } = credentials as {
+            phone: string;
+            otp: string;
+            name: string;
+          };
 
-        if (!parsedCredentials.success) {
+          if (!phone || !otp) {
+            return null;
+          }
+
+          // Verify OTP from database using Prisma
+          const otpRecord = await db.otp.findFirst({
+            where: {
+              phone,
+              otp,
+            },
+            orderBy: {
+              createdAt: "desc",
+            },
+          });
+
+          if (!otpRecord) {
+            return null;
+          }
+
+          // Check if OTP is already used
+          if (otpRecord.used) {
+            return null;
+          }
+
+          // Check if OTP has expired
+          if (new Date() > otpRecord.expiresAt) {
+            return null;
+          }
+
+          // Mark OTP as used
+          await db.otp.update({
+            where: { id: otpRecord.id },
+            data: { used: true },
+          });
+
+          // Find or create user
+          let user = await db.user.findUnique({
+            where: { phone },
+          });
+
+          if (!user) {
+            // Create new user
+            user = await db.user.create({
+              data: {
+                phone,
+                name: name || "User",
+                role: "AGENT", // Default role for new users
+              },
+            });
+          } else {
+            // Update last seen
+            await db.user.update({
+              where: { phone },
+              data: {
+                name: name || user.name,
+              },
+            });
+          }
+
+          return {
+            id: user.id,
+            phone: user.phone,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+            role: user.role,
+          };
+        } catch (error) {
+          console.error("OTP authorization error:", error);
           return null;
         }
-
-        const { email, password } = parsedCredentials.data;
-
-        // Find user by email
-        const user = await db.user.findUnique({
-          where: { email },
-        });
-
-        if (!user || !user.password) {
-          return null;
-        }
-
-        // Verify password
-        const passwordMatch = await bcrypt.compare(password, user.password);
-
-        if (!passwordMatch) {
-          return null;
-        }
-
-        // Return user object (without password)
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-          role: user.role,
-        };
       },
     }),
   ],
   adapter: PrismaAdapter(db) as any,
+  session: {
+    strategy: "jwt",
+  },
+  pages: {
+    signIn: "/signin",
+  },
   callbacks: {
-    session: ({ session, user }) => ({
+    jwt: ({ token, user }) => {
+      if (user) {
+        token.id = user.id;
+        token.role = user.role;
+      }
+      return token;
+    },
+    session: ({ session, token }) => ({
       ...session,
       user: {
         ...session.user,
-        id: user.id,
-        role: user.role,
+        id: token.id as string,
+        role: token.role as
+          | "SUPER_ADMIN"
+          | "ADMIN"
+          | "MANAGER"
+          | "AGENT"
+          | "VIEWER",
       },
     }),
   },

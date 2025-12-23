@@ -1,125 +1,106 @@
-
-import { PrismaClient, Difficulty } from '@prisma/client';
+import {
+  PrismaClient,
+  LeadSource,
+  LeadStatus,
+  Priority,
+  DealStage,
+  CourseMode,
+} from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Start seeding...');
+  console.log("Start seeding CRM data...");
 
-  // Create Subjects
-  const physics = await prisma.subject.upsert({
-    where: { name: 'Physics' },
-    update: {},
-    create: { name: 'Physics', code: 'PHY' },
-  });
-
-  const chemistry = await prisma.subject.upsert({
-    where: { name: 'Chemistry' },
-    update: {},
-    create: { name: 'Chemistry', code: 'CHEM' },
-  });
-
-  const math = await prisma.subject.upsert({
-    where: { name: 'Mathematics' },
-    update: {},
-    create: { name: 'Mathematics', code: 'MATH' },
-  });
-
-  console.log('Subjects created/verified.');
-
-  // Create Chapters
-  const mechanics = await prisma.chapter.upsert({
-    where: { subjectId_code: { subjectId: physics.id, code: 'PHY-01' } },
+  // Create sample courses
+  const course1 = await prisma.course.upsert({
+    where: { code: "JEE-MAIN-2025" },
     update: {},
     create: {
-      subjectId: physics.id,
-      name: 'Mechanics',
-      code: 'PHY-01',
+      code: "JEE-MAIN-2025",
+      name: "JEE Main 2025 Complete Course",
+      description: "Comprehensive preparation for JEE Main 2025",
+      category: "Engineering",
+      mode: CourseMode.HYBRID,
+      price: 45000,
+      discountPrice: 39999,
+      durationDays: 180,
+      isActive: true,
     },
   });
 
-  const organicChem = await prisma.chapter.upsert({
-    where: { subjectId_code: { subjectId: chemistry.id, code: 'CHEM-01' } },
+  const course2 = await prisma.course.upsert({
+    where: { code: "NEET-2025" },
     update: {},
     create: {
-      subjectId: chemistry.id,
-      name: 'Organic Chemistry',
-      code: 'CHEM-01',
+      code: "NEET-2025",
+      name: "NEET 2025 Complete Course",
+      description: "Complete preparation for NEET 2025",
+      category: "Medical",
+      mode: CourseMode.ONLINE,
+      price: 55000,
+      discountPrice: 49999,
+      durationDays: 240,
+      isActive: true,
     },
   });
 
-    const calculus = await prisma.chapter.upsert({
-    where: { subjectId_code: { subjectId: math.id, code: 'MATH-01' } },
+  const course3 = await prisma.course.upsert({
+    where: { code: "MHT-CET-2025" },
     update: {},
     create: {
-      subjectId: math.id,
-      name: 'Calculus',
-      code: 'MATH-01',
+      code: "MHT-CET-2025",
+      name: "MHT CET 2025 Crash Course",
+      description: "Intensive crash course for MHT CET",
+      category: "Engineering",
+      mode: CourseMode.OFFLINE,
+      price: 25000,
+      discountPrice: 22000,
+      durationDays: 90,
+      isActive: true,
     },
   });
 
-  console.log('Chapters created/verified.');
+  console.log("Courses created/verified.");
 
-  // Create Questions
-  await prisma.question.upsert({
-    where: { id: 'seed-question-1' },
+  // Create sample batches
+  const batch1 = await prisma.batch.upsert({
+    where: {
+      courseId_name: { courseId: course1.id, name: "JEE Main Morning Batch" },
+    },
     update: {},
     create: {
-      id: 'seed-question-1',
-      subjectId: physics.id,
-      chapterId: mechanics.id,
-      questionText: 'What is the law of conservation of energy?',
-      option1: 'Energy cannot be created or destroyed',
-      option2: 'Energy can be created and destroyed',
-      option3: 'Energy is always increasing',
-      option4: 'Energy is always decreasing',
-      correctOption: 1,
-      difficulty: Difficulty.EASY,
-      marks: 4,
-      negativeMarks: 1,
+      courseId: course1.id,
+      name: "JEE Main Morning Batch",
+      startDate: new Date("2025-02-01"),
+      endDate: new Date("2025-07-31"),
+      maxStudents: 50,
+      enrolledCount: 32,
+      timing: "9:00 AM - 12:00 PM",
+      isActive: true,
     },
   });
 
-  await prisma.question.upsert({
-    where: { id: 'seed-question-2' },
+  const batch2 = await prisma.batch.upsert({
+    where: {
+      courseId_name: { courseId: course2.id, name: "NEET Evening Batch" },
+    },
     update: {},
     create: {
-      id: 'seed-question-2',
-      subjectId: chemistry.id,
-      chapterId: organicChem.id,
-      questionText: 'What is the main component of natural gas?',
-      option1: 'Butane',
-      option2: 'Propane',
-      option3: 'Methane',
-      option4: 'Ethane',
-      correctOption: 3,
-      difficulty: Difficulty.MEDIUM,
-      marks: 4,
-      negativeMarks: 1,
+      courseId: course2.id,
+      name: "NEET Evening Batch",
+      startDate: new Date("2025-02-15"),
+      endDate: new Date("2025-10-15"),
+      maxStudents: 40,
+      enrolledCount: 28,
+      timing: "4:00 PM - 7:00 PM",
+      isActive: true,
     },
   });
 
-    await prisma.question.upsert({
-    where: { id: 'seed-question-3' },
-    update: {},
-    create: {
-      id: 'seed-question-3',
-      subjectId: math.id,
-      chapterId: calculus.id,
-      questionText: 'What is the integral of 1/x?',
-      option1: 'ln(x)',
-      option2: 'x^2',
-      option3: '1/x^2',
-      option4: 'e^x',
-      correctOption: 1,
-      difficulty: Difficulty.MEDIUM,
-      marks: 4,
-      negativeMarks: 1,
-    },
-  });
+  console.log("Batches created/verified.");
 
-
-  console.log('Sample questions created.');
+  console.log("CRM seed data created successfully!");
 }
 
 main()

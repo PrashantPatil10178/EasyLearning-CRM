@@ -1,237 +1,133 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
-import { TRPCError } from "@trpc/server";
+import {
+  createTRPCRouter,
+  protectedWorkspaceProcedure,
+} from "@/server/api/trpc";
 
 export const dealRouter = createTRPCRouter({
-  // Get all deals with filters
-  getAll: protectedProcedure
-    .input(
-      z.object({
-        stage: z.string().optional(),
-        ownerId: z.string().optional(),
-        search: z.string().optional(),
-        page: z.number().default(1),
-        limit: z.number().default(10),
-      }),
-    )
-    .query(async ({ ctx, input }) => {
-      const { stage, ownerId, search, page, limit } = input;
-      const skip = (page - 1) * limit;
-
-      const where = {
-        ...(stage && { stage: stage as never }),
-        ...(ownerId && { ownerId }),
-        ...(search && {
-          OR: [
-            { name: { contains: search } },
-            { lead: { firstName: { contains: search } } },
-            { lead: { lastName: { contains: search } } },
-          ],
-        }),
-      };
-
-      const [deals, total] = await Promise.all([
-        ctx.db.deal.findMany({
-          where,
-          skip,
-          take: limit,
-          orderBy: { createdAt: "desc" },
-          include: {
-            owner: {
-              select: { id: true, name: true, email: true, image: true },
-            },
-            lead: {
-              select: { id: true, firstName: true, lastName: true, phone: true, email: true },
-            },
-          },
-        }),
-        ctx.db.deal.count({ where }),
-      ]);
-
-      return {
-        deals,
-        total,
-        pages: Math.ceil(total / limit),
-        currentPage: page,
-      };
-    }),
-
-  // Get single deal by ID
-  getById: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }) => {
-      const deal = await ctx.db.deal.findUnique({
-        where: { id: input.id },
-        include: {
-          owner: {
-            select: { id: true, name: true, email: true, image: true },
-          },
-          createdBy: {
-            select: { id: true, name: true, email: true },
-          },
-          lead: {
-            include: {
-              activities: {
-                orderBy: { createdAt: "desc" },
-                take: 10,
-              },
-              notes: {
-                orderBy: { createdAt: "desc" },
-              },
-            },
+  // Get deals by stage for Kanban board
+  getByStage: protectedWorkspaceProcedure.query(async ({ ctx }) => {
+    const deals = await ctx.db.deal.findMany({
+      where: {
+        workspaceId: ctx.workspaceId,
+      },
+      include: {
+        lead: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
           },
         },
-      });
-
-      if (!deal) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Deal not found",
-        });
-      }
-
-      return deal;
-    }),
-
-  // Update deal
-  update: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        name: z.string().optional(),
-        amount: z.number().optional(),
-        stage: z.string().optional(),
-        probability: z.number().optional(),
-        courseName: z.string().optional(),
-        courseDuration: z.string().optional(),
-        batchStartDate: z.date().optional(),
-        expectedCloseDate: z.date().optional(),
-        notes: z.string().optional(),
-        ownerId: z.string().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const { id, ...data } = input;
-
-      const deal = await ctx.db.deal.update({
-        where: { id },
-        data: {
-          ...data,
-          stage: data.stage as never,
+        assignee: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+          },
         },
-      });
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+    });
 
-      return deal;
-    }),
+    // Group by stage
+    const grouped = deals.reduce(
+      (acc, deal) => {
+        const stage = deal.stage;
+        if (!acc[stage]) {
+          acc[stage] = [];
+        }
+        acc[stage].push(deal);
+        return acc;
+      },
+      {} as Record<string, typeof deals>,
+    );
 
-  // Update deal stage (for Kanban)
-  updateStage: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        stage: z.string(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const deal = await ctx.db.deal.update({
-        where: { id: input.id },
-        data: {
-          stage: input.stage as never,
-          ...(input.stage === "CLOSED_WON" && { actualCloseDate: new Date() }),
-          ...(input.stage === "CLOSED_LOST" && { actualCloseDate: new Date() }),
-        },
-      });
-
-      return deal;
-    }),
-
-  // Delete deal
-  delete: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      await ctx.db.deal.delete({ where: { id: input.id } });
-      return { success: true };
-    }),
+    return grouped;
+  }),
 
   // Get deal stats
-  getStats: protectedProcedure.query(async ({ ctx }) => {
-    const [
-      total,
-      qualification,
-      needsAnalysis,
-      proposal,
-      negotiation,
-      closedWon,
-      closedLost,
-    ] = await Promise.all([
-      ctx.db.deal.count(),
-      ctx.db.deal.count({ where: { stage: "QUALIFICATION" } }),
-      ctx.db.deal.count({ where: { stage: "NEEDS_ANALYSIS" } }),
-      ctx.db.deal.count({ where: { stage: "PROPOSAL" } }),
-      ctx.db.deal.count({ where: { stage: "NEGOTIATION" } }),
-      ctx.db.deal.count({ where: { stage: "CLOSED_WON" } }),
-      ctx.db.deal.count({ where: { stage: "CLOSED_LOST" } }),
-    ]);
-
-    // Calculate total pipeline value
-    const pipelineValue = await ctx.db.deal.aggregate({
+  getStats: protectedWorkspaceProcedure.query(async ({ ctx }) => {
+    const stats = await ctx.db.deal.groupBy({
+      by: ["stage"],
       where: {
-        stage: { notIn: ["CLOSED_WON", "CLOSED_LOST"] },
+        workspaceId: ctx.workspaceId,
       },
-      _sum: { amount: true },
+      _count: true,
+      _sum: {
+        value: true,
+      },
     });
 
-    // Calculate won value this month
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
-    const wonThisMonth = await ctx.db.deal.aggregate({
-      where: {
-        stage: "CLOSED_WON",
-        actualCloseDate: { gte: startOfMonth },
-      },
-      _sum: { amount: true },
-    });
+    const totalValue = stats.reduce(
+      (acc, curr) => acc + (curr._sum.value || 0),
+      0,
+    );
+    const totalCount = stats.reduce((acc, curr) => acc + curr._count, 0);
 
     return {
-      total,
-      stages: {
-        qualification,
-        needsAnalysis,
-        proposal,
-        negotiation,
-        closedWon,
-        closedLost,
-      },
-      pipelineValue: pipelineValue._sum.amount ?? 0,
-      wonThisMonth: wonThisMonth._sum.amount ?? 0,
-      winRate: total > 0 ? ((closedWon / (closedWon + closedLost)) * 100).toFixed(1) : "0",
+      byStage: stats,
+      totalValue,
+      totalCount,
     };
   }),
 
-  // Get deals by stage (for Kanban view)
-  getByStage: protectedProcedure.query(async ({ ctx }) => {
-    const stages = ["QUALIFICATION", "NEEDS_ANALYSIS", "PROPOSAL", "NEGOTIATION", "CLOSED_WON", "CLOSED_LOST"];
-    
-    const dealsByStage = await Promise.all(
-      stages.map(async (stage) => {
-        const deals = await ctx.db.deal.findMany({
-          where: { stage: stage as never },
-          orderBy: { updatedAt: "desc" },
-          include: {
-            owner: {
-              select: { id: true, name: true, image: true },
-            },
-            lead: {
-              select: { firstName: true, lastName: true, phone: true },
-            },
-          },
-        });
-        return { stage, deals };
+  // Create deal
+  create: protectedWorkspaceProcedure
+    .input(
+      z.object({
+        title: z.string().min(1),
+        value: z.number().min(0),
+        stage: z.enum([
+          "PROSPECT",
+          "QUALIFIED",
+          "PROPOSAL",
+          "NEGOTIATION",
+          "CLOSED_WON",
+          "CLOSED_LOST",
+        ]),
+        leadId: z.string().optional(),
+        assigneeId: z.string().optional(),
+        expectedCloseDate: z.date().optional(),
       }),
-    );
+    )
+    .mutation(async ({ ctx, input }) => {
+      return ctx.db.deal.create({
+        data: {
+          ...input,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+    }),
 
-    return dealsByStage;
-  }),
+  // Update deal stage (drag and drop)
+  updateStage: protectedWorkspaceProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        stage: z.enum([
+          "PROSPECT",
+          "QUALIFIED",
+          "PROPOSAL",
+          "NEGOTIATION",
+          "CLOSED_WON",
+          "CLOSED_LOST",
+        ]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return ctx.db.deal.update({
+        where: {
+          id: input.id,
+          workspaceId: ctx.workspaceId,
+        },
+        data: {
+          stage: input.stage,
+        },
+      });
+    }),
 });

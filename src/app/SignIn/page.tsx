@@ -16,28 +16,84 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Brain, ChevronLeft, Eye, EyeOff, Loader2 } from "lucide-react";
+import { ChevronLeft, Loader2, ArrowRight } from "lucide-react";
+import Image from "next/image";
+import { toast } from "sonner";
 
 export default function SignInPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [phone, setPhone] = useState("");
+  const [name, setName] = useState("");
+  const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate phone number (10 digits)
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (cleanPhone.length !== 10) {
+      toast.error("Please enter a valid 10-digit mobile number");
+      return;
+    }
+
+    if (!name.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
+
     setLoading(true);
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
-    setLoading(false);
-    if (result?.ok) {
-      router.push("/dashboard");
-    } else {
-      alert("Invalid credentials");
+    try {
+      const response = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: cleanPhone, name: name.trim() }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setOtpSent(true);
+        toast.success("OTP sent to your WhatsApp number!");
+      } else {
+        toast.error(data.error || "Failed to send OTP");
+      }
+    } catch (error) {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (otp.length !== 6) {
+      toast.error("Please enter a valid 6-digit OTP");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const cleanPhone = phone.replace(/\D/g, "");
+      const result = await signIn("otp", {
+        phone: cleanPhone,
+        otp,
+        name: name.trim(),
+        redirect: false,
+      });
+
+      if (result?.ok) {
+        toast.success("Login successful!");
+        router.push("/dashboard");
+      } else {
+        toast.error("Invalid OTP. Please check and try again.");
+      }
+    } catch (error) {
+      toast.error("Verification failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -70,79 +126,154 @@ export default function SignInPage() {
       <div className="animate-in fade-in zoom-in-95 z-10 w-full max-w-md duration-500">
         <Card className="border-white/10 bg-white/60 shadow-2xl backdrop-blur-xl dark:bg-black/40">
           <CardHeader className="space-y-3 text-center">
-            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-purple-600 shadow-lg shadow-blue-500/20">
-              <Brain className="h-6 w-6 text-white" />
+            <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center">
+              <Image
+                src="/logo.png"
+                alt="EasyLearning"
+                width={64}
+                height={64}
+                className="h-16 w-16 object-contain"
+              />
             </div>
             <CardTitle className="text-2xl font-bold tracking-tight">
-              Welcome back
+              {otpSent ? "Verify OTP" : "Welcome back"}
             </CardTitle>
             <CardDescription className="text-base">
-              Enter your credentials to access your dashboard
+              {otpSent
+                ? "Enter the 6-digit code sent to your WhatsApp"
+                : "Sign in with your WhatsApp number"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="bg-background/50 focus:bg-background transition-colors"
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    href="/forgot-password"
+            {!otpSent ? (
+              <form onSubmit={handleSendOTP} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="Your name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    maxLength={100}
+                    required
+                    className="bg-background/50 focus:bg-background transition-colors"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">WhatsApp Number</Label>
+                  <div className="flex gap-2">
+                    <span className="bg-background/50 inline-flex items-center rounded-lg border px-3 text-sm">
+                      +91
+                    </span>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      inputMode="numeric"
+                      placeholder="10-digit mobile"
+                      value={phone}
+                      onChange={(e) =>
+                        setPhone(e.target.value.replace(/\D/g, ""))
+                      }
+                      maxLength={10}
+                      pattern="[0-9]{10}"
+                      required
+                      className="bg-background/50 focus:bg-background transition-colors"
+                    />
+                  </div>
+                  <p className="text-muted-foreground text-xs">
+                    We'll send a 6-digit OTP on WhatsApp
+                  </p>
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 font-semibold text-white shadow-lg transition-all hover:scale-[1.02] hover:shadow-blue-500/25"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending OTP...
+                    </>
+                  ) : (
+                    <>
+                      Send OTP
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyOTP} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone-display">WhatsApp Number</Label>
+                  <div className="flex gap-2">
+                    <span className="bg-background/50 inline-flex items-center rounded-lg border px-3 text-sm">
+                      +91
+                    </span>
+                    <Input
+                      id="phone-display"
+                      type="tel"
+                      value={phone}
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtpSent(false);
+                      setOtp("");
+                    }}
                     className="text-xs text-blue-600 hover:underline dark:text-blue-400"
                   >
-                    Forgot password?
-                  </Link>
+                    Change number?
+                  </button>
                 </div>
-                <div className="relative">
+                <div className="space-y-2">
+                  <Label htmlFor="otp">Enter 6-digit OTP</Label>
                   <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    id="otp"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="000000"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                    maxLength={6}
+                    pattern="[0-9]{6}"
                     required
-                    className="bg-background/50 focus:bg-background pr-10 transition-colors"
+                    className="bg-background/50 focus:bg-background text-center text-lg tracking-widest transition-colors"
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground hover:text-foreground absolute top-0 right-0 h-full px-3 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
                 </div>
-              </div>
-              <Button
-                type="submit"
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 font-semibold text-white shadow-lg transition-all hover:scale-[1.02] hover:shadow-blue-500/25"
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing In...
-                  </>
-                ) : (
-                  "Sign In"
-                )}
-              </Button>
-            </form>
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 font-semibold text-white shadow-lg transition-all hover:scale-[1.02] hover:shadow-blue-500/25"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    "Verify & Continue"
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() =>
+                    handleSendOTP({
+                      preventDefault: () => {},
+                    } as React.FormEvent)
+                  }
+                  disabled={loading}
+                >
+                  Resend OTP
+                </Button>
+              </form>
+            )}
 
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
@@ -181,15 +312,9 @@ export default function SignInPage() {
               Google
             </Button>
           </CardContent>
-          <CardFooter className="border-border/40 flex justify-center border-t py-4">
-            <p className="text-muted-foreground text-sm">
-              Don't have an account?{" "}
-              <Link
-                href="/signup"
-                className="font-medium text-blue-600 hover:underline dark:text-blue-400"
-              >
-                Sign Up
-              </Link>
+          <CardFooter className="border-border/40 flex flex-col gap-2 border-t py-4">
+            <p className="text-muted-foreground text-center text-xs">
+              By continuing, you agree to our Terms & Privacy Policy.
             </p>
           </CardFooter>
         </Card>

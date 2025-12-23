@@ -46,39 +46,66 @@ import { usePathname, useRouter } from "next/navigation";
 import * as React from "react";
 import { Icons } from "../icons";
 import { OrgSwitcher } from "../org-switcher";
+import { api } from "@/trpc/react";
+
 export const company = {
-  name: "MHT CET Prep",
+  name: "EasyLearning CRM",
   logo: IconPhotoUp,
   plan: "Enterprise",
 };
 
-const tenants = [{ id: "1", name: "MHT CET Prep" }];
+function getCookie(name: string) {
+  if (typeof document === "undefined") return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(";").shift();
+  return null;
+}
 
 export default function AppSidebar() {
   const pathname = usePathname();
   const { isOpen } = useMediaQuery();
   const { data: session } = useSession();
   const router = useRouter();
-  const handleSwitchTenant = (_tenantId: string) => {};
 
-  const activeTenant = tenants[0] || { id: "1", name: "Default Tenant" };
+  const { data: workspaces, isLoading } = api.workspace.getAll.useQuery();
+
+  const handleSwitchTenant = (tenantId: string) => {
+    document.cookie = `workspace-id=${tenantId}; path=/; max-age=31536000`; // 1 year
+    window.location.reload();
+  };
+
+  const activeWorkspaceId = getCookie("workspace-id");
+  const activeTenant = workspaces?.find((w) => w.id === activeWorkspaceId) ||
+    workspaces?.[0] || { id: "loading", name: "Loading..." };
+
+  const tenants = workspaces?.map((w) => ({ id: w.id, name: w.name })) || [];
 
   // Get navigation items based on user role
-  const userRole = session?.user?.role || "STUDENT";
-  const navItems = React.useMemo(() => getNavItemsByRole(userRole), [userRole]);
+  const userRole = session?.user?.role || "AGENT";
+  const navItems = React.useMemo(
+    () =>
+      getNavItemsByRole(userRole as "ADMIN" | "MANAGER" | "AGENT" | "VIEWER"),
+    [userRole],
+  );
 
   React.useEffect(() => {
     // Side effects based on sidebar state changes
   }, [isOpen]);
 
+  // If no workspaces and not loading, maybe redirect to create workspace?
+  // For now, we just show empty or loading state.
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <OrgSwitcher
-          tenants={tenants}
-          defaultTenant={activeTenant}
-          onTenantSwitch={handleSwitchTenant}
-        />
+        {!isLoading && tenants.length > 0 && (
+          <OrgSwitcher
+            tenants={tenants}
+            defaultTenant={activeTenant}
+            onTenantSwitch={handleSwitchTenant}
+          />
+        )}
       </SidebarHeader>
       <SidebarContent className="overflow-x-hidden">
         <SidebarGroup>

@@ -1,19 +1,21 @@
-'use client';
+"use client";
 
-import { Check, ChevronsUpDown, GalleryVerticalEnd } from 'lucide-react';
-import * as React from 'react';
+import { Check, ChevronsUpDown } from "lucide-react";
+import * as React from "react";
+import Image from "next/image";
 
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   SidebarMenu,
   SidebarMenuButton,
-  SidebarMenuItem
-} from '@/components/ui/sidebar';
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
 
 interface Tenant {
   id: string;
@@ -23,7 +25,7 @@ interface Tenant {
 export function OrgSwitcher({
   tenants,
   defaultTenant,
-  onTenantSwitch
+  onTenantSwitch,
 }: {
   tenants: Tenant[];
   defaultTenant: Tenant;
@@ -49,34 +51,48 @@ export function OrgSwitcher({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
-              size='lg'
-              className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
+              size="lg"
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div className='bg-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg'>
-                <GalleryVerticalEnd className='size-4' />
+              <div className="flex aspect-square size-8 items-center justify-center rounded-lg">
+                <Image
+                  src="/logo.png"
+                  alt="EasyLearning"
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 object-contain"
+                />
               </div>
-              <div className='flex flex-col gap-0.5 leading-none'>
-                <span className='font-semibold'>Next Starter</span>
-                <span className=''>{selectedTenant.name}</span>
+              <div className="flex flex-col gap-0.5 leading-none">
+                <span className="font-semibold">EasyLearning</span>
+                <span className="">{selectedTenant.name}</span>
               </div>
-              <ChevronsUpDown className='ml-auto' />
+              <ChevronsUpDown className="ml-auto" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className='w-[--radix-dropdown-menu-trigger-width]'
-            align='start'
+            className="w-[--radix-dropdown-menu-trigger-width]"
+            align="start"
           >
             {tenants.map((tenant) => (
               <DropdownMenuItem
                 key={tenant.id}
                 onSelect={() => handleTenantSwitch(tenant)}
               >
-                {tenant.name}{' '}
+                {tenant.name}{" "}
                 {tenant.id === selectedTenant.id && (
-                  <Check className='ml-auto' />
+                  <Check className="ml-auto" />
                 )}
               </DropdownMenuItem>
             ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() =>
+                (window.location.href = "/dashboard/create-workspace")
+              }
+            >
+              <span className="font-medium">Create Workspace</span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

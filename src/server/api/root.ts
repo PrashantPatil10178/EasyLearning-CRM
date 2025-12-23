@@ -1,12 +1,18 @@
 import { dashboardRouter } from "@/server/api/routers/dashboard";
 import { userRouter } from "@/server/api/routers/user";
 import { leadRouter } from "@/server/api/routers/lead";
-import { dealRouter } from "@/server/api/routers/deal";
 import { taskRouter } from "@/server/api/routers/task";
-import { callRouter } from "@/server/api/routers/call";
+import { callLogRouter } from "@/server/api/routers/call";
 import { campaignRouter } from "@/server/api/routers/campaign";
 import { teamRouter } from "@/server/api/routers/team";
 import { courseRouter } from "@/server/api/routers/course";
+import { paymentRouter } from "@/server/api/routers/payment";
+import { activityRouter } from "@/server/api/routers/activity";
+import { workspaceRouter } from "@/server/api/routers/workspace";
+import { integrationRouter } from "@/server/api/routers/integration";
+import { dealRouter } from "@/server/api/routers/deal";
+import { whatsappRouter } from "@/server/api/routers/whatsapp";
+import { settingsRouter } from "@/server/api/routers/settings";
 import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
 
 /**
@@ -18,12 +24,18 @@ export const appRouter = createTRPCRouter({
   dashboard: dashboardRouter,
   user: userRouter,
   lead: leadRouter,
-  deal: dealRouter,
   task: taskRouter,
-  call: callRouter,
+  callLog: callLogRouter,
   campaign: campaignRouter,
   team: teamRouter,
   course: courseRouter,
+  payment: paymentRouter,
+  activity: activityRouter,
+  workspace: workspaceRouter,
+  integration: integrationRouter,
+  deal: dealRouter,
+  whatsapp: whatsappRouter,
+  settings: settingsRouter,
 });
 
 // export type definition of API

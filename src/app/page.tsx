@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -26,7 +27,6 @@ import {
   BarChart3,
   Sparkles,
   Zap,
-  GraduationCap,
   Star,
   Quote,
   Calendar,
@@ -61,8 +61,14 @@ export default async function Home() {
                   href="/"
                   className="flex items-center space-x-2 transition-opacity hover:opacity-80"
                 >
-                  <div className="bg-primary/10 flex h-9 w-9 items-center justify-center rounded-lg">
-                    <GraduationCap className="text-primary h-5 w-5" />
+                  <div className="flex h-9 w-9 items-center justify-center">
+                    <Image
+                      src="/logo.png"
+                      alt="EasyLearning"
+                      width={36}
+                      height={36}
+                      className="h-9 w-9 object-contain"
+                    />
                   </div>
                   <span className="text-xl font-bold tracking-tight">
                     EasyLearning CRM
@@ -103,7 +109,7 @@ export default async function Home() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="bg-slate-200"
+                        className="bg-slate-200 dark:text-black"
                         asChild
                       >
                         <Link href="/signin">Log in</Link>
@@ -145,9 +151,9 @@ export default async function Home() {
                     </h1>
 
                     <p className="text-muted-foreground animate-in fade-in slide-in-from-bottom-8 mb-8 max-w-[600px] text-lg sm:text-xl">
-                      Stop losing leads. EasyLearning CRM helps coaching institutes
-                      track leads, manage calls, close deals, and grow admissions
-                      with powerful automation.
+                      Stop losing leads. EasyLearning CRM helps coaching
+                      institutes track leads, manage calls, close deals, and
+                      grow admissions with powerful automation.
                     </p>
 
                     <div className="animate-in fade-in slide-in-from-bottom-10 flex flex-col gap-4 sm:flex-row">
@@ -221,13 +227,21 @@ export default async function Home() {
 
                         <div className="grid grid-cols-3 gap-4">
                           {[
-                            { label: "New Leads", val: 47, color: "bg-blue-500" },
+                            {
+                              label: "New Leads",
+                              val: 47,
+                              color: "bg-blue-500",
+                            },
                             {
                               label: "Calls Made",
                               val: 124,
                               color: "bg-purple-500",
                             },
-                            { label: "Deals Won", val: 12, color: "bg-green-500" },
+                            {
+                              label: "Deals Won",
+                              val: 12,
+                              color: "bg-green-500",
+                            },
                           ].map((stat) => (
                             <div
                               key={stat.label}
@@ -242,7 +256,9 @@ export default async function Home() {
                               <div className="bg-muted mt-2 h-1.5 w-full rounded-full">
                                 <div
                                   className={`h-full rounded-full ${stat.color}`}
-                                  style={{ width: `${Math.min(stat.val, 100)}%` }}
+                                  style={{
+                                    width: `${Math.min(stat.val, 100)}%`,
+                                  }}
                                 />
                               </div>
                             </div>
@@ -257,8 +273,9 @@ export default async function Home() {
                                 Hot Lead Alert
                               </div>
                               <div className="text-muted-foreground text-xs">
-                                <strong>Rahul Verma</strong> visited pricing page 3 times.
-                                Score: 85/100. Recommend immediate follow-up.
+                                <strong>Rahul Verma</strong> visited pricing
+                                page 3 times. Score: 85/100. Recommend immediate
+                                follow-up.
                               </div>
                             </div>
                           </div>
@@ -280,16 +297,21 @@ export default async function Home() {
                   Trusted by Leading Coaching Institutes
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-8 opacity-60 grayscale transition-all duration-500 hover:opacity-100 hover:grayscale-0 md:gap-16">
-                  {["Career Point", "Allen Institute", "FIITJEE", "Aakash", "Vidyalankar", "Resonance"].map(
-                    (institute) => (
-                      <div
-                        key={institute}
-                        className="text-xl font-bold md:text-2xl"
-                      >
-                        {institute}
-                      </div>
-                    ),
-                  )}
+                  {[
+                    "Career Point",
+                    "Allen Institute",
+                    "FIITJEE",
+                    "Aakash",
+                    "Vidyalankar",
+                    "Resonance",
+                  ].map((institute) => (
+                    <div
+                      key={institute}
+                      className="text-xl font-bold md:text-2xl"
+                    >
+                      {institute}
+                    </div>
+                  ))}
                 </div>
               </div>
             </section>
@@ -451,7 +473,8 @@ export default async function Home() {
                     Simple, Affordable Pricing
                   </h2>
                   <p className="text-muted-foreground">
-                    Choose a plan that fits your institute&apos;s needs. All plans include free onboarding.
+                    Choose a plan that fits your institute&apos;s needs. All
+                    plans include free onboarding.
                   </p>
                 </div>
 
@@ -544,7 +567,11 @@ export default async function Home() {
                           variant={plan.popular ? "default" : "outline"}
                           asChild
                         >
-                          <Link href="/signup">Choose {plan.title}</Link>
+                          <Link href="/signup">
+                            {plan.price === "Custom"
+                              ? "Contact Sales"
+                              : `Choose ${plan.title}`}
+                          </Link>
                         </Button>
                       </CardFooter>
                     </Card>
@@ -560,11 +587,11 @@ export default async function Home() {
 
               <div className="relative container mx-auto px-4 text-center md:px-6">
                 <h2 className="mb-6 text-3xl font-bold tracking-tight sm:text-4xl">
-                  Ready to secure your seat at a top college?
+                  Ready to 10X Your Admissions?
                 </h2>
                 <p className="text-primary-foreground/80 mx-auto mb-10 max-w-2xl text-lg">
-                  Join thousands of students optimizing their prep with AI. No
-                  credit card required for the trial.
+                  Join 500+ coaching institutes already using EasyLearning CRM.
+                  Start your free trial today - no credit card required.
                 </p>
                 <div className="flex flex-col justify-center gap-4 sm:flex-row">
                   <Button
@@ -574,8 +601,18 @@ export default async function Home() {
                     asChild
                   >
                     <Link href="/signup">
-                      Get Started for Free{" "}
-                      <ArrowRight className="ml-2 h-5 w-5" />
+                      Start Free Trial <ArrowRight className="ml-2 h-5 w-5" />
+                    </Link>
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="h-14 border-white/20 px-8 text-lg font-semibold text-white hover:bg-white/10"
+                    asChild
+                  >
+                    <Link href="#pricing">
+                      <Phone className="mr-2 h-5 w-5" />
+                      Schedule Demo
                     </Link>
                   </Button>
                 </div>
@@ -591,16 +628,20 @@ export default async function Home() {
                 <Accordion type="single" collapsible className="w-full">
                   {[
                     {
-                      q: "Is this helpful for JEE Mains too?",
-                      a: "Yes! While optimized for MHT CET, the Physics and Chemistry syllabus overlaps 90% with JEE Mains. Many students use it for both.",
+                      q: "How long does setup take?",
+                      a: "You can be up and running in less than 30 minutes! Our onboarding team will help you import existing leads and configure your pipeline.",
                     },
                     {
-                      q: "Can I use it on my phone?",
-                      a: "Absolutely. We have dedicated apps for iOS and Android, and the web platform is fully responsive.",
+                      q: "Can I integrate with my website?",
+                      a: "Yes! We provide easy embed forms, API access, and integrations with popular website builders and landing page tools.",
                     },
                     {
-                      q: "How accurate is the score prediction?",
-                      a: "Our AI model has been trained on 5 years of result data. It typically predicts your percentile within a +/- 2% margin.",
+                      q: "Is there a mobile app?",
+                      a: "Absolutely. Our mobile app (iOS & Android) lets your team log calls, update leads, and access dashboards on the go.",
+                    },
+                    {
+                      q: "Can I import my existing leads?",
+                      a: "Yes, we support bulk import from Excel, CSV, and can even migrate data from other CRMs like Zoho, HubSpot, or spreadsheets.",
                     },
                   ].map((faq, i) => (
                     <AccordionItem key={i} value={`item-${i}`}>
@@ -623,32 +664,38 @@ export default async function Home() {
               <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
                 <div>
                   <div className="mb-4 flex items-center gap-2 text-lg font-bold">
-                    <div className="bg-primary/10 flex h-8 w-8 items-center justify-center rounded-lg border border-blue-500/20">
-                      <Brain className="text-primary h-4 w-4" />
+                    <div className="flex h-8 w-8 items-center justify-center">
+                      <Image
+                        src="/logo.png"
+                        alt="EasyLearning"
+                        width={32}
+                        height={32}
+                        className="h-8 w-8 object-contain"
+                      />
                     </div>
-                    MHT CET Prep
+                    EasyLearning CRM
                   </div>
                   <p className="text-muted-foreground mb-4 max-w-xs">
-                    Empowering students with data-driven preparation strategies
-                    for a brighter engineering future.
+                    The #1 CRM built specifically for coaching institutes and
+                    educational organizations.
                   </p>
                 </div>
                 <div>
                   <h3 className="mb-4 font-semibold">Product</h3>
                   <ul className="text-muted-foreground space-y-2">
                     <li>
-                      <Link href="#" className="hover:text-foreground">
+                      <Link href="#features" className="hover:text-foreground">
                         Features
                       </Link>
                     </li>
                     <li>
-                      <Link href="#" className="hover:text-foreground">
+                      <Link href="#pricing" className="hover:text-foreground">
                         Pricing
                       </Link>
                     </li>
                     <li>
                       <Link href="#" className="hover:text-foreground">
-                        Success Stories
+                        Integrations
                       </Link>
                     </li>
                   </ul>
@@ -663,12 +710,12 @@ export default async function Home() {
                     </li>
                     <li>
                       <Link href="#" className="hover:text-foreground">
-                        CET Syllabus
+                        Help Center
                       </Link>
                     </li>
                     <li>
                       <Link href="#" className="hover:text-foreground">
-                        Cut-off Lists
+                        API Docs
                       </Link>
                     </li>
                   </ul>
@@ -690,7 +737,7 @@ export default async function Home() {
                 </div>
               </div>
               <div className="text-muted-foreground mt-12 border-t pt-8 text-center">
-                <p>&copy; 2025 MHT CET Prep. All rights reserved.</p>
+                <p>&copy; 2025 EasyLearning CRM. All rights reserved.</p>
               </div>
             </div>
           </footer>

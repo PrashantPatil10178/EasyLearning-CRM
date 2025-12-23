@@ -1,9 +1,14 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure, adminProcedure } from "@/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedWorkspaceProcedure,
+  adminWorkspaceProcedure,
+} from "@/server/api/trpc";
+import { TRPCError } from "@trpc/server";
 
 export const courseRouter = createTRPCRouter({
   // Get all courses
-  getAll: protectedProcedure
+  getAll: protectedWorkspaceProcedure
     .input(
       z.object({
         category: z.string().optional(),
@@ -15,6 +20,7 @@ export const courseRouter = createTRPCRouter({
       const { category, mode, isActive } = input;
 
       const where = {
+        workspaceId: ctx.workspaceId,
         ...(category && { category }),
         ...(mode && { mode: mode as never }),
         ...(isActive !== undefined && { isActive }),
@@ -34,11 +40,14 @@ export const courseRouter = createTRPCRouter({
     }),
 
   // Get single course with batches
-  getById: protectedProcedure
+  getById: protectedWorkspaceProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const course = await ctx.db.course.findUnique({
-        where: { id: input.id },
+        where: {
+          id: input.id,
+          workspaceId: ctx.workspaceId,
+        },
         include: {
           batches: {
             orderBy: { startDate: "asc" },
@@ -50,7 +59,7 @@ export const courseRouter = createTRPCRouter({
     }),
 
   // Create course
-  create: adminProcedure
+  create: adminWorkspaceProcedure
     .input(
       z.object({
         name: z.string().min(1),
@@ -76,6 +85,7 @@ export const courseRouter = createTRPCRouter({
           durationDays: input.durationDays,
           durationHours: input.durationHours,
           mode: input.mode as never,
+          workspaceId: ctx.workspaceId,
         },
       });
 
@@ -83,7 +93,7 @@ export const courseRouter = createTRPCRouter({
     }),
 
   // Update course
-  update: adminProcedure
+  update: adminWorkspaceProcedure
     .input(
       z.object({
         id: z.string(),
@@ -101,7 +111,21 @@ export const courseRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
 
-      const course = await ctx.db.course.update({
+      const course = await ctx.db.course.findFirst({
+        where: {
+          id,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!course) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Course not found or you don't have access",
+        });
+      }
+
+      const updatedCourse = await ctx.db.course.update({
         where: { id },
         data: {
           ...data,
@@ -109,13 +133,27 @@ export const courseRouter = createTRPCRouter({
         },
       });
 
-      return course;
+      return updatedCourse;
     }),
 
   // Delete course
-  delete: adminProcedure
+  delete: adminWorkspaceProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      const course = await ctx.db.course.findFirst({
+        where: {
+          id: input.id,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!course) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Course not found or you don't have access",
+        });
+      }
+
       await ctx.db.course.delete({ where: { id: input.id } });
       return { success: true };
     }),
@@ -125,11 +163,14 @@ export const courseRouter = createTRPCRouter({
   // ==================
 
   // Get batches for a course
-  getBatches: protectedProcedure
+  getBatches: protectedWorkspaceProcedure
     .input(z.object({ courseId: z.string() }))
     .query(async ({ ctx, input }) => {
       const batches = await ctx.db.batch.findMany({
-        where: { courseId: input.courseId },
+        where: {
+          courseId: input.courseId,
+          workspaceId: ctx.workspaceId,
+        },
         orderBy: { startDate: "asc" },
         include: {
           course: {
@@ -142,9 +183,10 @@ export const courseRouter = createTRPCRouter({
     }),
 
   // Get upcoming batches
-  getUpcomingBatches: protectedProcedure.query(async ({ ctx }) => {
+  getUpcomingBatches: protectedWorkspaceProcedure.query(async ({ ctx }) => {
     const batches = await ctx.db.batch.findMany({
       where: {
+        workspaceId: ctx.workspaceId,
         status: "UPCOMING",
         startDate: { gte: new Date() },
       },
@@ -161,7 +203,7 @@ export const courseRouter = createTRPCRouter({
   }),
 
   // Create batch
-  createBatch: adminProcedure
+  createBatch: adminWorkspaceProcedure
     .input(
       z.object({
         name: z.string().min(1),
@@ -174,6 +216,20 @@ export const courseRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const course = await ctx.db.course.findFirst({
+        where: {
+          id: input.courseId,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!course) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Course not found or you don't have access",
+        });
+      }
+
       const batch = await ctx.db.batch.create({
         data: {
           name: input.name,
@@ -183,6 +239,7 @@ export const courseRouter = createTRPCRouter({
           timing: input.timing,
           days: input.days,
           maxStudents: input.maxStudents,
+          workspaceId: ctx.workspaceId,
         },
       });
 
@@ -190,7 +247,7 @@ export const courseRouter = createTRPCRouter({
     }),
 
   // Update batch
-  updateBatch: adminProcedure
+  updateBatch: adminWorkspaceProcedure
     .input(
       z.object({
         id: z.string(),
@@ -207,7 +264,21 @@ export const courseRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
 
-      const batch = await ctx.db.batch.update({
+      const batch = await ctx.db.batch.findFirst({
+        where: {
+          id,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!batch) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Batch not found or you don't have access",
+        });
+      }
+
+      const updatedBatch = await ctx.db.batch.update({
         where: { id },
         data: {
           ...data,
@@ -215,13 +286,27 @@ export const courseRouter = createTRPCRouter({
         },
       });
 
-      return batch;
+      return updatedBatch;
     }),
 
   // Delete batch
-  deleteBatch: adminProcedure
+  deleteBatch: adminWorkspaceProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      const batch = await ctx.db.batch.findFirst({
+        where: {
+          id: input.id,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!batch) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Batch not found or you don't have access",
+        });
+      }
+
       await ctx.db.batch.delete({ where: { id: input.id } });
       return { success: true };
     }),

@@ -39,7 +39,7 @@ import {
   IconBriefcase,
   IconCheckbox,
   IconChecklist,
-  IconMegaphone,
+  IconSpeakerphone,
   IconUsersGroup,
   IconSchool,
   IconCalendar,
@@ -61,6 +61,7 @@ import {
   IconCurrencyRupee,
   IconNote,
   IconClipboard,
+  IconPlug,
 } from "@tabler/icons-react";
 import type { IconProps } from "@tabler/icons-react";
 
@@ -71,14 +72,15 @@ export const Icons = {
   dashboard: IconLayoutDashboard,
   logo: IconCommand,
   kanban: IconLayoutKanban,
-  
+  plug: IconPlug,
+
   // Navigation
   login: IconLogin,
   close: IconX,
   chevronLeft: IconChevronLeft,
   chevronRight: IconChevronRight,
   arrowRight: IconArrowRight,
-  
+
   // Actions
   add: IconPlus,
   trash: IconTrash,
@@ -90,7 +92,7 @@ export const Icons = {
   upload: IconUpload,
   refresh: IconRefresh,
   check: IconCheck,
-  
+
   // CRM Core
   users: IconUsers,
   usersGroup: IconUsersGroup,
@@ -98,14 +100,14 @@ export const Icons = {
   user2: IconUserCircle,
   userPen: IconUserEdit,
   employee: IconUserX,
-  
+
   // Communication
   phone: IconPhone,
   phoneCall: IconPhoneCall,
   mail: IconMail,
   message: IconMessageCircle,
-  megaphone: IconMegaphone,
-  
+  megaphone: IconSpeakerphone,
+
   // Business
   briefcase: IconBriefcase,
   building: IconBuilding,
@@ -113,31 +115,31 @@ export const Icons = {
   currency: IconCurrencyRupee,
   target: IconTarget,
   trending: IconTrendingUp,
-  
+
   // Tasks & Notes
   checkSquare: IconCheckbox,
   checklist: IconChecklist,
   note: IconNote,
   clipboard: IconClipboard,
-  
+
   // Content
   product: IconShoppingBag,
   post: IconFileText,
   page: IconFile,
   fileText: IconFileText,
   media: IconPhoto,
-  
+
   // Education (EasyLearning specific)
   graduationCap: IconSchool,
-  
+
   // Analytics
   barChart: IconChartBar,
   circleDot: IconCircleDot,
-  
+
   // Time & Calendar
   clock: IconClock,
   calendar: IconCalendar,
-  
+
   // Misc
   settings: IconSettings,
   ellipsis: IconDotsVertical,
@@ -147,16 +149,16 @@ export const Icons = {
   star: IconStar,
   tag: IconTag,
   location: IconMapPin,
-  
+
   // Theme
   sun: IconSun,
   moon: IconMoon,
   laptop: IconDeviceLaptop,
-  
+
   // Social
   github: IconBrandGithub,
   twitter: IconBrandTwitter,
-  
+
   // Loading
   spinner: IconLoader2,
 };

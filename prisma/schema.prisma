@@ -46,13 +46,13 @@ model Session {
 
 model User {
   id            String    @id @default(cuid())
-  email         String    @unique
+  email         String?   @unique
   emailVerified DateTime?
   name          String?
   image         String?
   password      String?
   role          UserRole  @default(AGENT)
-  phone         String?
+  phone         String?   @unique
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -68,11 +68,13 @@ model User {
   createdTasks     Task[]           @relation("TaskCreator")
   notes            Note[]
   calls            Call[]
+  deals            Deal[]           @relation("DealAssignee")
   campaigns        Campaign[]       @relation("CampaignCreator")
   campaignMembers  CampaignMember[]
-  deals            Deal[]           @relation("DealOwner")
-  createdDeals     Deal[]           @relation("DealCreator")
   
+  // Workspace Relations
+  workspaces       WorkspaceMember[]
+
   // Team Relations
   teamId           String?
   team             Team?            @relation("TeamMembers", fields: [teamId], references: [id])
@@ -90,11 +92,126 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
+// OTP for phone-based authentication
+model Otp {
+  id        String   @id @default(cuid())
+  phone     String
+  otp       String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+  @@index([otp])
+  @@map("otps")
+}
+
 enum UserRole {
-  ADMIN      // Platform admin - full access
+  SUPER_ADMIN // Platform super admin - can manage workspaces
+  ADMIN      // Platform admin - full access (Legacy, maybe migrate to Workspace Admin)
   MANAGER    // Team manager - manage team and leads
   AGENT      // Sales agent - handle leads and calls
   VIEWER     // Read-only access
+}
+
+// ============================================
+// WORKSPACE MANAGEMENT (Multi-Tenancy)
+// ============================================
+
+model Workspace {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  logo        String?
+  
+  // Settings
+  settings    String?  // JSON settings
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  members     WorkspaceMember[]
+  leads       Lead[]
+  campaigns   Campaign[]
+  tasks       Task[]
+  teams       Team[]
+  courses     Course[]
+  activities  Activity[]
+  calls       Call[]
+  notes       Note[]
+  payments    Payment[]
+  batches     Batch[]
+  dailyStats  DailyStats[]
+  configSettings Setting[]
+  integrations Integration[]
+  whatsappTriggers WhatsAppTrigger[]
+  leadFields  LeadField[]
+  deals       Deal[]
+
+  @@map("workspaces")
+}
+
+model LeadField {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  name        String   // Display Name (e.g. "Course Purchased")
+  key         String   // Internal key (e.g. "course_purchased")
+  type        String   // TEXT, NUMBER, SELECT, DATE, BOOLEAN, EMAIL, PHONE
+  options     String?  // JSON array for SELECT options
+  
+  order       Int      @default(0)
+  isVisible   Boolean  @default(true)
+  isRequired  Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
+  @@map("lead_fields")
+}
+
+
+model WhatsAppTrigger {
+  id                 String   @id @default(cuid())
+  workspaceId        String
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  status             String
+  isEnabled          Boolean  @default(false)
+  campaignName       String?
+  source             String?  @default("CRM")
+  templateParamsJson String?  @default("[]")
+  paramsFallbackJson String?  @default("{}")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([workspaceId, status])
+  @@map("whatsapp_triggers")
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        WorkspaceRole @default(MEMBER)
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([workspaceId, userId])
+  @@map("workspace_members")
+}
+
+enum WorkspaceRole {
+  ADMIN
+  MANAGER
+  MEMBER
+  VIEWER
 }
 
 // ============================================
@@ -108,9 +225,14 @@ model Team {
   managerId   String
   manager     User     @relation("TeamManager", fields: [managerId], references: [id])
   members     User[]   @relation("TeamMembers")
+  
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@index([workspaceId])
   @@map("teams")
 }
 
@@ -139,6 +261,16 @@ model Lead {
   preferredBatch   String?
   budget           Float?
   
+  // Additional Lead Details (from PHP system)
+  revenue          Float?     @default(0)
+  feedbackNeeded   Boolean    @default(false)
+  leadType         String?    // e.g., "Hot", "Warm", "Cold"
+  className        String?    // Class name or grade
+  medium           String?    // Medium of instruction
+  batch            String?    // Batch identifier
+  campaign         String?    // Campaign name/source
+  doneAt           DateTime?  // When lead was marked as done
+  
   // Location
   city        String?
   state       String?
@@ -151,6 +283,8 @@ model Lead {
   owner       User?       @relation("LeadOwner", fields: [ownerId], references: [id])
   createdById String
   createdBy   User        @relation("LeadCreator", fields: [createdById], references: [id])
+  assignedAt  DateTime?   // When lead was assigned
+  assignedBy  String?     // Who assigned the lead (for tracking)
   
   // Follow-up
   nextFollowUp  DateTime?
@@ -170,18 +304,24 @@ model Lead {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  // Workspace
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
   // Relations
   activities  Activity[]
   tasks       Task[]
   notes       Note[]
   calls       Call[]
-  deal        Deal?
+  payments    Payment[]
+  deals       Deal[]
   campaignLeads CampaignLead[]
 
   @@index([status])
   @@index([ownerId])
   @@index([phone])
   @@index([email])
+  @@index([workspaceId])
   @@map("leads")
 }
 
@@ -212,6 +352,8 @@ enum LeadStatus {
   CONVERTED
   LOST
   DO_NOT_CONTACT
+  WON
+  DONE
 }
 
 enum Priority {
@@ -222,81 +364,33 @@ enum Priority {
 }
 
 // ============================================
-// DEAL / OPPORTUNITY MANAGEMENT
-// ============================================
-
-model Deal {
-  id            String      @id @default(cuid())
-  name          String
-  amount        Float
-  currency      String      @default("INR")
-  
-  // Deal Stage
-  stage         DealStage   @default(QUALIFICATION)
-  probability   Int         @default(10)  // Win probability %
-  
-  // Course Details (for EasyLearning)
-  courseName    String?
-  courseDuration String?
-  batchStartDate DateTime?
-  
-  // Dates
-  expectedCloseDate DateTime?
-  actualCloseDate   DateTime?
-  
-  // Assignment
-  ownerId       String
-  owner         User        @relation("DealOwner", fields: [ownerId], references: [id])
-  createdById   String
-  createdBy     User        @relation("DealCreator", fields: [createdById], references: [id])
-  
-  // Lead Relation
-  leadId        String      @unique
-  lead          Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  
-  // Notes
-  notes         String?
-  
-  // Timestamps
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-
-  @@index([stage])
-  @@index([ownerId])
-  @@map("deals")
-}
-
-enum DealStage {
-  QUALIFICATION
-  NEEDS_ANALYSIS
-  PROPOSAL
-  NEGOTIATION
-  CLOSED_WON
-  CLOSED_LOST
-}
-
-// ============================================
 // ACTIVITY TRACKING
 // ============================================
 
 model Activity {
   id          String       @id @default(cuid())
   type        ActivityType
-  subject     String
-  description String?
+  subject     String?      // Made optional for simpler activity logs
+  description String?      // Renamed from message, stores activity details
+  message     String?      // Activity message/note
   
   // Relations
   leadId      String
   lead        Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  userId      String
-  user        User         @relation(fields: [userId], references: [id])
+  userId      String?
+  user        User?        @relation(fields: [userId], references: [id])
   
   // Timestamps
-  performedAt DateTime     @default(now())
+  performedAt DateTime?    // Made optional
   createdAt   DateTime     @default(now())
+
+  // Workspace
+  workspaceId String?
+  workspace   Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([leadId])
   @@index([userId])
+  @@index([workspaceId])
   @@map("activities")
 }
 
@@ -309,9 +403,10 @@ enum ActivityType {
   NOTE
   STATUS_CHANGE
   TASK_COMPLETED
-  DEAL_CREATED
   LEAD_ASSIGNED
   FOLLOW_UP_SCHEDULED
+  EDIT
+  SYSTEM
 }
 
 // ============================================
@@ -320,17 +415,19 @@ enum ActivityType {
 
 model Task {
   id          String     @id @default(cuid())
-  title       String
-  description String?
-  dueDate     DateTime?
+  title       String?    // Made optional
+  description String?    // Renamed from note
+  note        String?    // Task note/details
+  dueDate     DateTime?  // Renamed from dueAt
+  dueAt       DateTime?  // Alternative field name from PHP
   priority    Priority   @default(MEDIUM)
   status      TaskStatus @default(PENDING)
   
   // Assignment
   assigneeId  String
   assignee    User       @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  createdById String
-  createdBy   User       @relation("TaskCreator", fields: [createdById], references: [id])
+  createdById String?
+  createdBy   User?      @relation("TaskCreator", fields: [createdById], references: [id])
   
   // Lead Relation (optional)
   leadId      String?
@@ -343,9 +440,14 @@ model Task {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
+  // Workspace
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
   @@index([assigneeId])
   @@index([status])
   @@index([dueDate])
+  @@index([workspaceId])
   @@map("tasks")
 }
 
@@ -354,6 +456,7 @@ enum TaskStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+  UPCOMING
 }
 
 // ============================================
@@ -374,7 +477,12 @@ model Note {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Workspace
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
   @@index([leadId])
+  @@index([workspaceId])
   @@map("notes")
 }
 
@@ -415,8 +523,13 @@ model Call {
   endedAt       DateTime?
   createdAt     DateTime    @default(now())
 
+  // Workspace
+  workspaceId   String?
+  workspace     Workspace?  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
   @@index([leadId])
   @@index([userId])
+  @@index([workspaceId])
   @@map("calls")
 }
 
@@ -481,10 +594,15 @@ model Campaign {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
+  // Workspace
+  workspaceId   String?
+  workspace     Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
   // Relations
   members       CampaignMember[]
   leads         CampaignLead[]
 
+  @@index([workspaceId])
   @@map("campaigns")
 }
 
@@ -566,8 +684,14 @@ model Course {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  // Workspace
+  workspaceId   String?
+  workspace     Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
   // Relations
   batches       Batch[]
+
+  @@index([workspaceId])
 
   @@map("courses")
 }
@@ -601,6 +725,11 @@ model Batch {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
+  // Workspace
+  workspaceId   String?
+  workspace     Workspace?  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
   @@map("batches")
 }
 
@@ -617,7 +746,11 @@ enum BatchStatus {
 
 model DailyStats {
   id              String   @id @default(cuid())
-  date            DateTime @unique
+  date            DateTime
+  
+  // Workspace
+  workspaceId     String?
+  workspace       Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   
   // Lead Stats
   newLeads        Int      @default(0)
@@ -643,7 +776,111 @@ model DailyStats {
   
   createdAt       DateTime @default(now())
 
+  @@unique([date, workspaceId])
+  @@index([workspaceId])
   @@map("daily_stats")
+}
+
+// ============================================
+// PAYMENT TRACKING
+// ============================================
+
+model Payment {
+  id            String        @id @default(cuid())
+  
+  // Payment Details
+  amount        Float
+  currency      String        @default("INR")
+  paymentMode   PaymentMode   @default(ONLINE)
+  status        PaymentStatus @default(PENDING)
+  
+  // Transaction Details
+  transactionId String?
+  referenceNo   String?
+  paymentDate   DateTime?
+  
+  // Payment Gateway
+  gateway       String?       // Razorpay, Stripe, etc.
+  gatewayResponse String?     // JSON string
+  
+  // Lead Relation (Changed from Deal)
+  leadId        String?
+  lead          Lead?         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  // Notes
+  notes         String?
+  
+  // Timestamps
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Workspace
+  workspaceId   String?
+  workspace     Workspace?    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([status])
+  @@index([workspaceId])
+  @@map("payments")
+}
+
+enum PaymentMode {
+  CASH
+  ONLINE
+  CARD
+  UPI
+  CHEQUE
+  BANK_TRANSFER
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+  PARTIALLY_PAID
+}
+
+// ============================================
+// DEAL MANAGEMENT
+// ============================================
+
+model Deal {
+  id          String     @id @default(cuid())
+  title       String
+  value       Float      @default(0)
+  currency    String     @default("INR")
+  stage       DealStage  @default(PROSPECT)
+  probability Int        @default(0) // 0-100%
+  expectedCloseDate DateTime?
+
+  // Relations
+  leadId      String?
+  lead        Lead?      @relation(fields: [leadId], references: [id])
+  assigneeId  String?
+  assignee    User?      @relation("DealAssignee", fields: [assigneeId], references: [id])
+  
+  // Workspace
+  workspaceId String
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([workspaceId])
+  @@index([stage])
+  @@map("deals")
+}
+
+enum DealStage {
+  PROSPECT
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  CLOSED_WON
+  CLOSED_LOST
 }
 
 // ============================================
@@ -652,13 +889,38 @@ model DailyStats {
 
 model Setting {
   id        String   @id @default(cuid())
-  key       String   @unique
+  key       String
   value     String
   type      String   @default("string") // string, number, boolean, json
   category  String   @default("general")
   
+  // Workspace
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([key, workspaceId])
+  @@index([workspaceId])
   @@map("settings")
+}
+
+// ============================================
+// INTEGRATIONS
+// ============================================
+
+model Integration {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  provider    String   // e.g. "CALLERDESK"
+  config      String   // JSON string
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, provider])
+  @@index([workspaceId])
+  @@map("integrations")
 }
