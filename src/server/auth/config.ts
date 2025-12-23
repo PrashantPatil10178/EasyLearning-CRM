@@ -129,6 +129,7 @@ export const authConfig = {
   pages: {
     signIn: "/signin",
   },
+  trustHost: true,
   callbacks: {
     jwt: ({ token, user }) => {
       if (user) {
