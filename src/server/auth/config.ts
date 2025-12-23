@@ -2,6 +2,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { type DefaultSession, type NextAuthConfig } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
 
 import { db } from "@/server/db";
 
@@ -32,6 +33,54 @@ declare module "next-auth" {
 export const authConfig = {
   providers: [
     GoogleProvider,
+    CredentialsProvider({
+      id: "email",
+      name: "Email",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        try {
+          const { email, password } = credentials as {
+            email: string;
+            password: string;
+          };
+
+          if (!email || !password) {
+            return null;
+          }
+
+          // Find user by email
+          const user = await db.user.findUnique({
+            where: { email },
+          });
+
+          if (!user || !user.password) {
+            return null;
+          }
+
+          // Verify password
+          const isValidPassword = await bcrypt.compare(password, user.password);
+
+          if (!isValidPassword) {
+            return null;
+          }
+
+          return {
+            id: user.id,
+            phone: user.phone,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+            role: user.role,
+          };
+        } catch (error) {
+          console.error("Email authorization error:", error);
+          return null;
+        }
+      },
+    }),
     CredentialsProvider({
       id: "otp",
       name: "OTP",

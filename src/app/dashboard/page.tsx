@@ -33,10 +33,16 @@ export default async function Dashboard() {
   }
 
   // Check for workspaces
-  const workspaces = await api.workspace.getAll();
+  let workspaces;
+  try {
+    workspaces = await api.workspace.getAll();
+  } catch (error) {
+    // If workspace access fails, user might not be authenticated properly
+    return redirect("/signin");
+  }
 
   if (workspaces.length === 0) {
-    return redirect("/dashboard/create-workspace");
+    return redirect("/no-workspace");
   }
 
   let stats;

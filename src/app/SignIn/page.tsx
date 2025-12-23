@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
   CardContent,
@@ -16,17 +17,54 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ChevronLeft, Loader2, ArrowRight } from "lucide-react";
+import { ChevronLeft, Loader2, ArrowRight, Mail, Phone } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
 
 export default function SignInPage() {
+  const [loginMethod, setLoginMethod] = useState<"email" | "phone">("email");
+  
+  // Email login state
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  
+  // Phone login state
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [otp, setOtp] = useState("");
-  const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  const handleEmailSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!email || !password) {
+      toast.error("Please enter both email and password");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await signIn("email", {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (result?.ok) {
+        toast.success("Login successful!");
+        router.push("/dashboard");
+      } else {
+        toast.error("Invalid email or password");
+      }
+    } catch (error) {
+      toast.error("Login failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,144 +174,205 @@ export default function SignInPage() {
               />
             </div>
             <CardTitle className="text-2xl font-bold tracking-tight">
-              {otpSent ? "Verify OTP" : "Welcome back"}
+              Welcome back
             </CardTitle>
             <CardDescription className="text-base">
-              {otpSent
-                ? "Enter the 6-digit code sent to your WhatsApp"
-                : "Sign in with your WhatsApp number"}
+              Sign in to your account to continue
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!otpSent ? (
-              <form onSubmit={handleSendOTP} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="Your name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    maxLength={100}
-                    required
-                    className="bg-background/50 focus:bg-background transition-colors"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">WhatsApp Number</Label>
-                  <div className="flex gap-2">
-                    <span className="bg-background/50 inline-flex items-center rounded-lg border px-3 text-sm">
-                      +91
-                    </span>
+            <Tabs defaultValue="email" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="email" className="gap-2">
+                  <Mail className="h-4 w-4" />
+                  Email
+                </TabsTrigger>
+                <TabsTrigger value="phone" className="gap-2">
+                  <Phone className="h-4 w-4" />
+                  Phone
+                </TabsTrigger>
+              </TabsList>
+              
+              {/* Email Login */}
+              <TabsContent value="email" className="space-y-4 mt-4">
+                <form onSubmit={handleEmailSignIn} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email Address</Label>
                     <Input
-                      id="phone"
-                      type="tel"
-                      inputMode="numeric"
-                      placeholder="10-digit mobile"
-                      value={phone}
-                      onChange={(e) =>
-                        setPhone(e.target.value.replace(/\D/g, ""))
-                      }
-                      maxLength={10}
-                      pattern="[0-9]{10}"
+                      id="email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       required
                       className="bg-background/50 focus:bg-background transition-colors"
                     />
                   </div>
-                  <p className="text-muted-foreground text-xs">
-                    We'll send a 6-digit OTP on WhatsApp
-                  </p>
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 font-semibold text-white shadow-lg transition-all hover:scale-[1.02] hover:shadow-blue-500/25"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Sending OTP...
-                    </>
-                  ) : (
-                    <>
-                      Send OTP
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </>
-                  )}
-                </Button>
-              </form>
-            ) : (
-              <form onSubmit={handleVerifyOTP} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phone-display">WhatsApp Number</Label>
-                  <div className="flex gap-2">
-                    <span className="bg-background/50 inline-flex items-center rounded-lg border px-3 text-sm">
-                      +91
-                    </span>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
                     <Input
-                      id="phone-display"
-                      type="tel"
-                      value={phone}
-                      disabled
-                      className="bg-muted"
+                      id="password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      className="bg-background/50 focus:bg-background transition-colors"
                     />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOtpSent(false);
-                      setOtp("");
-                    }}
-                    className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                  <Button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 font-semibold text-white shadow-lg transition-all hover:scale-[1.02] hover:shadow-blue-500/25"
+                    disabled={loading}
                   >
-                    Change number?
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="otp">Enter 6-digit OTP</Label>
-                  <Input
-                    id="otp"
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="000000"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                    maxLength={6}
-                    pattern="[0-9]{6}"
-                    required
-                    className="bg-background/50 focus:bg-background text-center text-lg tracking-widest transition-colors"
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 font-semibold text-white shadow-lg transition-all hover:scale-[1.02] hover:shadow-blue-500/25"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Verifying...
-                    </>
-                  ) : (
-                    "Verify & Continue"
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="w-full"
-                  onClick={() =>
-                    handleSendOTP({
-                      preventDefault: () => {},
-                    } as React.FormEvent)
-                  }
-                  disabled={loading}
-                >
-                  Resend OTP
-                </Button>
-              </form>
-            )}
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Signing in...
+                      </>
+                    ) : (
+                      <>
+                        Sign In
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </TabsContent>
+
+              {/* Phone Login */}
+              <TabsContent value="phone" className="space-y-4 mt-4">
+                {!otpSent ? (
+                  <form onSubmit={handleSendOTP} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Full Name</Label>
+                      <Input
+                        id="name"
+                        type="text"
+                        placeholder="Your name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        maxLength={100}
+                        required
+                        className="bg-background/50 focus:bg-background transition-colors"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">WhatsApp Number</Label>
+                      <div className="flex gap-2">
+                        <span className="bg-background/50 inline-flex items-center rounded-lg border px-3 text-sm">
+                          +91
+                        </span>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          inputMode="numeric"
+                          placeholder="10-digit mobile"
+                          value={phone}
+                          onChange={(e) =>
+                            setPhone(e.target.value.replace(/\D/g, ""))
+                          }
+                          maxLength={10}
+                          pattern="[0-9]{10}"
+                          required
+                          className="bg-background/50 focus:bg-background transition-colors"
+                        />
+                      </div>
+                      <p className="text-muted-foreground text-xs">
+                        We'll send a 6-digit OTP on WhatsApp
+                      </p>
+                    </div>
+                    <Button
+                      type="submit"
+                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 font-semibold text-white shadow-lg transition-all hover:scale-[1.02] hover:shadow-blue-500/25"
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Sending OTP...
+                        </>
+                      ) : (
+                        <>
+                          Send OTP
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleVerifyOTP} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="phone-display">WhatsApp Number</Label>
+                      <div className="flex gap-2">
+                        <span className="bg-background/50 inline-flex items-center rounded-lg border px-3 text-sm">
+                          +91
+                        </span>
+                        <Input
+                          id="phone-display"
+                          type="tel"
+                          value={phone}
+                          disabled
+                          className="bg-muted"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOtpSent(false);
+                          setOtp("");
+                        }}
+                        className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        Change number?
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="otp">Enter 6-digit OTP</Label>
+                      <Input
+                        id="otp"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="000000"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                        maxLength={6}
+                        pattern="[0-9]{6}"
+                        required
+                        className="bg-background/50 focus:bg-background text-center text-lg tracking-widest transition-colors"
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 font-semibold text-white shadow-lg transition-all hover:scale-[1.02] hover:shadow-blue-500/25"
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Verifying...
+                        </>
+                      ) : (
+                        "Verify & Continue"
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="w-full"
+                      onClick={() =>
+                        handleSendOTP({
+                          preventDefault: () => {},
+                        } as React.FormEvent)
+                      }
+                      disabled={loading}
+                    >
+                      Resend OTP
+                    </Button>
+                  </form>
+                )}
+              </TabsContent>
+            </Tabs>
 
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">

@@ -20,18 +20,13 @@ const sendOTPViaAisensy = async (
   otp: string,
   userName: string,
 ) => {
-  // Skip actual SMS sending in non-production environments
-  if (process.env.NODE_ENV !== "production") {
-    console.log(`🔑 DEMO OTP for ${phone}: ${otp}`);
-    return { success: "true" };
-  }
-
   const AISENSY_API_URL = process.env.AISENSY_API_URL;
   const AISENSY_API_KEY = process.env.AISENSY_API_KEY;
 
   if (!AISENSY_API_URL || !AISENSY_API_KEY) {
     console.warn("AISensy credentials not configured. Skipping OTP send.");
-    return { success: "true" }; // Allow in dev mode
+    console.log(`🔑 DEMO OTP for ${phone}: ${otp}`);
+    return { success: "true" }; // Allow when credentials missing
   }
 
   const payload = {
@@ -150,16 +145,6 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // In development, show the OTP in the response
-    if (process.env.NODE_ENV !== "production") {
-      return NextResponse.json({
-        success: true,
-        message: "OTP created for demo (not sent via SMS)",
-        phone: formattedPhone.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3"),
-        demoOTP: otp, // Only include in non-production
-      });
-    }
-
     // Send OTP via AISensy WhatsApp
     const aisensyResponse = await sendOTPViaAisensy(
       formattedPhone,
@@ -172,6 +157,8 @@ export async function POST(request: NextRequest) {
         success: true,
         message: "OTP sent successfully via WhatsApp",
         phone: formattedPhone.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3"),
+        // Include OTP in dev mode for testing
+        ...(process.env.NODE_ENV !== "production" && { demoOTP: otp }),
       });
     } else {
       console.error("AISensy API error:", aisensyResponse);
