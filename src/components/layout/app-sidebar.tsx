@@ -36,10 +36,14 @@ import {
   IconBell,
   IconChevronRight,
   IconChevronsDown,
-  IconCreditCard,
   IconLogout,
   IconPhotoUp,
   IconUserCircle,
+  IconUsers,
+  IconListDetails,
+  IconPhone,
+  IconBuilding,
+  IconHelp,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -222,17 +226,62 @@ export default function AppSidebar() {
                     onClick={() => router.push("/dashboard/profile")}
                   >
                     <IconUserCircle className="mr-2 h-4 w-4" />
-                    Profile
+                    My Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <IconCreditCard className="mr-2 h-4 w-4" />
-                    Billing
+                  <DropdownMenuItem
+                    onClick={() =>
+                      router.push(
+                        "/dashboard/leads?ownerId=" + session?.user?.id,
+                      )
+                    }
+                  >
+                    <IconUsers className="mr-2 h-4 w-4" />
+                    My Leads
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <IconBell className="mr-2 h-4 w-4" />
-                    Notifications
+                  <DropdownMenuItem
+                    onClick={() => router.push("/dashboard/overview")}
+                  >
+                    <IconListDetails className="mr-2 h-4 w-4" />
+                    My Tasks
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => router.push("/dashboard/call-logs")}
+                  >
+                    <IconPhone className="mr-2 h-4 w-4" />
+                    Call Logs
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
+
+                {(session?.user?.role === "ADMIN" ||
+                  session?.user?.role === "MANAGER") && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem
+                        onClick={() => router.push("/dashboard/organization")}
+                      >
+                        <IconBuilding className="mr-2 h-4 w-4" />
+                        Workspace Settings
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => router.push("/dashboard/students")}
+                      >
+                        <IconUsers className="mr-2 h-4 w-4" />
+                        Manage Users
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                  </>
+                )}
+
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() =>
+                    window.open("https://support.easylearning.com", "_blank")
+                  }
+                >
+                  <IconHelp className="mr-2 h-4 w-4" />
+                  Help & Support
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => signOut({ callbackUrl: "/auth/sign-in" })}

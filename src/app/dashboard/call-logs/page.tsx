@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import PageContainer from "@/components/layout/page-container";
 import {
   Card,
@@ -95,6 +95,10 @@ export default function CallLogsPage() {
   const [callerNum, setCallerNum] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Live calls state
+  const [liveCallsCount, setLiveCallsCount] = useState(0);
+  const [isLoadingLiveCalls, setIsLoadingLiveCalls] = useState(false);
+
   // Fetch call logs using tRPC
   const { data, isLoading, refetch } =
     api.integration.getCallerDeskCallLogs.useQuery({
@@ -158,6 +162,29 @@ export default function CallLogsPage() {
   };
 
   const totalPages = Math.ceil(totalRecords / 25);
+
+  // Fetch live calls from API
+  const fetchLiveCalls = async () => {
+    try {
+      setIsLoadingLiveCalls(true);
+      const response = await fetch("/api/callerdesk/live-calls");
+      if (response.ok) {
+        const data = await response.json();
+        setLiveCallsCount(data.totalLiveCalls || 0);
+      }
+    } catch (error) {
+      console.error("Error fetching live calls:", error);
+    } finally {
+      setIsLoadingLiveCalls(false);
+    }
+  };
+
+  // Poll live calls every 10 seconds
+  useEffect(() => {
+    fetchLiveCalls(); // Initial fetch
+    const interval = setInterval(fetchLiveCalls, 10000); // Poll every 10 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <PageContainer scrollable>
@@ -635,6 +662,33 @@ export default function CallLogsPage() {
           </Card>
         )}
       </div>
+
+      {/* Fixed Live Calls Indicator Button */}
+      <button
+        onClick={fetchLiveCalls}
+        disabled={isLoadingLiveCalls}
+        className="group fixed right-6 bottom-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-green-500 to-emerald-600 px-4 py-3 text-white shadow-lg transition-all hover:scale-105 hover:shadow-xl disabled:opacity-50 sm:right-8 sm:bottom-8 sm:px-5 sm:py-4"
+      >
+        <div className="relative">
+          {liveCallsCount > 0 && (
+            <div className="absolute -top-1 -right-1 h-3 w-3 animate-ping rounded-full bg-white opacity-75"></div>
+          )}
+          <Phone
+            className={`h-5 w-5 sm:h-6 sm:w-6 ${
+              isLoadingLiveCalls ? "animate-pulse" : ""
+            } ${liveCallsCount > 0 ? "animate-bounce" : ""}`}
+          />
+        </div>
+        <div className="flex flex-col items-start">
+          <span className="text-xs font-medium opacity-90">Live Calls</span>
+          <span className="text-xl leading-none font-bold sm:text-2xl">
+            {liveCallsCount}
+          </span>
+        </div>
+        {liveCallsCount > 0 && (
+          <div className="h-2 w-2 animate-pulse rounded-full bg-white"></div>
+        )}
+      </button>
     </PageContainer>
   );
 }
