@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { decrypt, isEncrypted } from "@/lib/encryption";
+import axios from "axios";
+import https from "https";
 
 // CallerDesk API Configuration
 // Add these to your .env file:
 // CALLERDESK_API_KEY=your_api_key
 // CALLERDESK_DESKPHONE=your_deskphone_number (VN/Tollfree)
+
+// Create an HTTPS agent that accepts self-signed certificates
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: false, // Allow self-signed certificates
+});
 
 function cleanPhone(phone: string): string {
   if (!phone) return "";
@@ -37,6 +44,17 @@ export async function POST(request: NextRequest) {
     if (!user?.phone) {
       return NextResponse.json(
         { error: "Agent phone number not found. Please update your profile." },
+        { status: 400 },
+      );
+    }
+
+    // Check if user has an assigned deskphone
+    if (!user.callerDeskPhone) {
+      return NextResponse.json(
+        {
+          error:
+            "No CallerDesk deskphone assigned to you. Please contact your administrator.",
+        },
         { status: 400 },
       );
     }
@@ -89,7 +107,6 @@ export async function POST(request: NextRequest) {
     }
 
     let authCode: string | undefined;
-    let deskPhone: string | undefined;
 
     try {
       const config = JSON.parse(integration.config);
@@ -108,10 +125,7 @@ export async function POST(request: NextRequest) {
         config.secretKey = decrypt(config.secretKey);
       }
 
-      deskPhone = config.deskPhone;
-
       console.log("[CallerDesk] Auth code length:", authCode?.length);
-      console.log("[CallerDesk] Desk phone:", deskPhone);
     } catch (e) {
       console.error("Failed to parse integration config", e);
       return NextResponse.json(
@@ -120,15 +134,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!authCode || !deskPhone) {
+    if (!authCode) {
       return NextResponse.json(
         {
           error:
-            "CallerDesk configuration incomplete. Please setup API Key and Desk Phone in Integration settings.",
+            "CallerDesk configuration incomplete. Please setup API Key in Integration settings.",
         },
         { status: 400 },
       );
     }
+
+    // Use user's assigned deskphone
+    const deskPhone = user.callerDeskPhone;
 
     console.log("[CallerDesk] Lead phone:", phone);
 
@@ -143,7 +160,7 @@ export async function POST(request: NextRequest) {
     console.log(
       `[CallerDesk] Auth Code (first 8 chars): ${authCode.substring(0, 8)}...`,
     );
-    console.log(`[CallerDesk] Desk Phone: ${deskPhone}`);
+    console.log(`[CallerDesk] User Assigned Desk Phone: ${deskPhone}`);
 
     // Construct CallerDesk API request
     // Endpoint: https://app.callerdesk.io/api/click_to_call_v2
@@ -162,25 +179,54 @@ export async function POST(request: NextRequest) {
       `[CallerDesk] Initiating call - Agent: ${agentPhone}, Customer: ${customerPhone}, Desk: ${deskPhone}`,
     );
 
-    // Execute GET Request with query parameters
-    const response = await fetch(apiUrl, {
-      method: "GET",
+    console.log({ apiUrl });
+
+    // Execute GET Request using axios with SSL verification disabled
+    const response = await axios.get(apiUrl, {
+      httpsAgent,
+      timeout: 30000, // 30 second timeout
     });
 
-    const responseText = await response.text();
+    const responseText =
+      typeof response.data === "string"
+        ? response.data
+        : JSON.stringify(response.data);
     console.log("[CallerDesk Response]:", responseText);
 
     let responseData: any = {};
-    try {
-      responseData = JSON.parse(responseText);
-    } catch (e) {
-      console.error("[CallerDesk] Response is not JSON:", responseText);
-      responseData = { message: responseText };
+    if (typeof response.data === "object") {
+      responseData = response.data;
+    } else {
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (e) {
+        console.error("[CallerDesk] Response is not JSON:", responseText);
+        responseData = { message: responseText };
+      }
     }
 
     // Check HTTP status AND response body for errors
     // CallerDesk returns {"type": "success"} or {"type": "error"}
     const isSuccess = response.ok && responseData?.type === "success";
+
+    // If CallerDesk returned an error, provide a helpful message
+    if (responseData?.type === "error") {
+      console.error("[CallerDesk] API Error:", responseData.message);
+
+      // Provide specific error messages based on the response
+      let errorMessage = responseData.message;
+      if (errorMessage.includes("Invalid Deskphone")) {
+        errorMessage = `Invalid Deskphone: The deskphone number (${deskPhone}) is not registered in your CallerDesk account. Please update your CallerDesk integration settings with the correct Virtual Number (VN) or Tollfree number.`;
+      } else if (errorMessage.includes("Invalid Authcode")) {
+        errorMessage =
+          "Invalid API Key: Please check your CallerDesk API key in the integration settings.";
+      }
+
+      return NextResponse.json(
+        { error: errorMessage, details: responseData },
+        { status: 400 },
+      );
+    }
 
     // Log activity and call record
     if (leadId) {

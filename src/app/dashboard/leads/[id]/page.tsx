@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
+import { CallCompletionModal } from "@/components/modal/call-completion-modal";
 import PageContainer from "@/components/layout/page-container";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -65,15 +66,17 @@ export default function LeadDetailPage() {
   const [feedbackNeeded, setFeedbackNeeded] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState("");
   const [isCallingCallerDesk, setIsCallingCallerDesk] = useState(false);
+  const [showCallCompletionModal, setShowCallCompletionModal] = useState(false);
 
   const {
     data: lead,
     isLoading,
     refetch,
   } = api.lead.getById.useQuery({ id: leadId });
-  const { data: activities = [] } = api.activity.getByLeadId.useQuery({
-    leadId,
-  }) as { data: Array<any> };
+  const { data: activities = [], refetch: refetchActivities } =
+    api.activity.getByLeadId.useQuery({
+      leadId,
+    }) as { data: Array<any>; refetch: () => void };
   const { data: tasks = [] } = api.task.getByLeadId.useQuery({ leadId });
 
   const updateStatusMutation = api.lead.updateStatus.useMutation({
@@ -228,7 +231,13 @@ export default function LeadDetailPage() {
                   });
                   const data = await response.json();
                   if (response.ok) {
-                    toast.success("CallerDesk call initiated!");
+                    toast.success(
+                      "CallerDesk call initiated! Please wait for the call to connect.",
+                    );
+                    // Open the call completion modal after a short delay
+                    setTimeout(() => {
+                      setShowCallCompletionModal(true);
+                    }, 2000);
                   } else {
                     toast.error(data.error || "Failed to initiate call");
                   }
@@ -343,44 +352,104 @@ export default function LeadDetailPage() {
                           <p>No activities recorded yet.</p>
                         </div>
                       ) : (
-                        <div className="border-muted relative ml-2 space-y-6 border-l pl-6">
-                          {activities.map((activity) => (
-                            <div key={activity.id} className="relative">
-                              <span className="bg-background ring-muted absolute top-1 -left-[31px] flex h-4 w-4 items-center justify-center rounded-full ring-2">
-                                <div className="bg-primary h-2 w-2 rounded-full" />
-                              </span>
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm font-medium">
-                                    {activity.type.replace("_", " ")}
-                                  </span>
-                                  <span className="text-muted-foreground text-xs">
-                                    {format(
-                                      new Date(activity.createdAt),
-                                      "MMM d, h:mm a",
-                                    )}
-                                  </span>
-                                </div>
-                                <p className="text-muted-foreground text-sm">
-                                  {(activity as any).message ||
-                                    activity.description}
-                                </p>
-                                {activity.user && (
-                                  <div className="text-muted-foreground mt-1 flex items-center gap-1 text-xs">
-                                    <Avatar className="h-4 w-4">
-                                      <AvatarImage
-                                        src={activity.user.image || ""}
+                        <div className="border-muted relative ml-4 space-y-8 border-l-2 pl-6 sm:ml-2 sm:space-y-6 sm:pl-6">
+                          {activities.map((activity) => {
+                            // Determine icon and color based on activity type
+                            const getActivityStyle = (type: string) => {
+                              switch (type) {
+                                case "CALL":
+                                  return {
+                                    color: "bg-green-500",
+                                    icon: PhoneCall,
+                                  };
+                                case "EMAIL":
+                                  return { color: "bg-blue-500", icon: Mail };
+                                case "STATUS_CHANGE":
+                                  return {
+                                    color: "bg-purple-500",
+                                    icon: CheckCircle2,
+                                  };
+                                case "EDIT":
+                                  return { color: "bg-orange-500", icon: Edit };
+                                case "NOTE":
+                                  return {
+                                    color: "bg-yellow-500",
+                                    icon: StickyNote,
+                                  };
+                                case "FOLLOW_UP_SCHEDULED":
+                                  return {
+                                    color: "bg-blue-500",
+                                    icon: Calendar,
+                                  };
+                                case "TASK_COMPLETED":
+                                  return {
+                                    color: "bg-green-500",
+                                    icon: CheckCircle2,
+                                  };
+                                default:
+                                  return { color: "bg-primary", icon: Clock };
+                              }
+                            };
+
+                            const { color, icon: ActivityIcon } =
+                              getActivityStyle(activity.type);
+
+                            return (
+                              <div key={activity.id} className="relative">
+                                <span
+                                  className={`bg-background ring-muted absolute top-1 -left-[37px] flex h-8 w-8 items-center justify-center rounded-full ring-2 sm:-left-[31px] sm:h-4 sm:w-4`}
+                                >
+                                  <div
+                                    className={`${color} h-4 w-4 rounded-full sm:h-2 sm:w-2`}
+                                  />
+                                </span>
+                                <div className="flex flex-col gap-2 sm:gap-1">
+                                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <ActivityIcon
+                                        className={`h-4 w-4 ${color.replace("bg-", "text-")}`}
                                       />
-                                      <AvatarFallback className="text-[8px]">
-                                        {getInitials(activity.user.name || "")}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    {activity.user.name}
+                                      <span className="text-base font-semibold capitalize sm:text-sm">
+                                        {activity.type
+                                          .replace(/_/g, " ")
+                                          .toLowerCase()}
+                                      </span>
+                                    </div>
+                                    <span className="text-muted-foreground text-sm sm:text-xs">
+                                      {format(
+                                        new Date(activity.createdAt),
+                                        "MMM d, h:mm a",
+                                      )}
+                                    </span>
                                   </div>
-                                )}
+                                  {activity.subject && (
+                                    <p className="text-sm font-medium">
+                                      {activity.subject}
+                                    </p>
+                                  )}
+                                  <p className="text-muted-foreground text-base leading-relaxed sm:text-sm">
+                                    {(activity as any).message ||
+                                      activity.description}
+                                  </p>
+                                  {activity.user && (
+                                    <div className="text-muted-foreground mt-2 flex items-center gap-2 text-sm sm:mt-1 sm:gap-1 sm:text-xs">
+                                      <Avatar className="h-6 w-6 sm:h-4 sm:w-4">
+                                        <AvatarImage
+                                          src={activity.user.image || ""}
+                                        />
+                                        <AvatarFallback className="text-xs sm:text-[8px]">
+                                          {getInitials(
+                                            activity.user.name || "",
+                                          )}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      {activity.user.name}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </ScrollArea>
@@ -762,6 +831,22 @@ export default function LeadDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Call Completion Modal */}
+      {lead && (
+        <CallCompletionModal
+          open={showCallCompletionModal}
+          onClose={() => setShowCallCompletionModal(false)}
+          leadId={lead.id}
+          leadName={`${lead.firstName} ${lead.lastName || ""}`.trim()}
+          leadPhone={lead.phone || ""}
+          leadCurrentStatus={lead.status}
+          onSave={() => {
+            refetch();
+            refetchActivities();
+          }}
+        />
+      )}
     </PageContainer>
   );
 }

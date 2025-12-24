@@ -60,6 +60,7 @@ export const userRouter = createTRPCRouter({
           image: true,
           role: true,
           phone: true,
+          callerDeskPhone: true,
           createdAt: true,
           team: {
             select: { id: true, name: true },
@@ -516,5 +517,51 @@ export const userRouter = createTRPCRouter({
         totalCalls,
         totalRevenue: revenue._sum.revenue ?? 0,
       };
+    }),
+
+  // Update user deskphone
+  updateDeskphone: protectedWorkspaceProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        deskphone: z.string().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Check if target user is in workspace
+      const targetMember = await ctx.db.workspaceMember.findUnique({
+        where: {
+          workspaceId_userId: {
+            workspaceId: ctx.workspaceId,
+            userId: input.userId,
+          },
+        },
+      });
+
+      if (!targetMember) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found in this workspace",
+        });
+      }
+
+      // Only allow admins/managers to update deskphone
+      const isAdmin = ["ADMIN", "MANAGER", "SUPER_ADMIN"].includes(
+        ctx.workspaceMember?.role ?? "",
+      );
+
+      if (!isAdmin) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only admins can assign deskphones",
+        });
+      }
+
+      const user = await ctx.db.user.update({
+        where: { id: input.userId },
+        data: { callerDeskPhone: input.deskphone },
+      });
+
+      return user;
     }),
 });

@@ -53,6 +53,7 @@ model User {
   password      String?
   role          UserRole  @default(AGENT)
   phone         String?   @unique
+  callerDeskPhone String? // Assigned CallerDesk IVR/Deskphone number
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

@@ -8,7 +8,7 @@ async function makeAdmin() {
     const phone = "7620170904";
     const name = "Prashant Patil";
     const email = "prashant@easylearning.com";
-    const password = "admin123"; // Demo password
+    const password = "admin123";
 
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 12);

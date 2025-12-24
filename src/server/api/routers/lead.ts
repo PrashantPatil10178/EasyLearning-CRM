@@ -249,6 +249,66 @@ export const leadRouter = createTRPCRouter({
         });
       }
 
+      // Track field changes for activity log
+      const changes: string[] = [];
+      const fieldLabels: Record<string, string> = {
+        firstName: "First Name",
+        lastName: "Last Name",
+        email: "Email",
+        phone: "Phone",
+        altPhone: "Alternate Phone",
+        source: "Source",
+        status: "Status",
+        priority: "Priority",
+        courseInterested: "Course Interested",
+        courseLevel: "Course Level",
+        preferredBatch: "Preferred Batch",
+        budget: "Budget",
+        city: "City",
+        state: "State",
+        country: "Country",
+        pincode: "Pincode",
+        address: "Address",
+        ownerId: "Owner",
+        nextFollowUp: "Next Follow-up",
+        campaign: "Campaign",
+      };
+
+      // Check each field for changes
+      for (const [key, value] of Object.entries(data)) {
+        if (value !== undefined && key in currentLead) {
+          const oldValue = (currentLead as any)[key];
+          const newValue = value;
+
+          // Skip if values are the same
+          if (oldValue === newValue) continue;
+
+          // Handle empty strings as null for comparison
+          if (
+            (oldValue === null || oldValue === "") &&
+            (newValue === "" || newValue === null)
+          )
+            continue;
+
+          // Format change message
+          const label = fieldLabels[key] || key;
+          const oldDisplay = oldValue?.toString() || "(empty)";
+          const newDisplay = newValue?.toString() || "(empty)";
+
+          if (key === "nextFollowUp") {
+            const oldDate = oldValue
+              ? new Date(oldValue).toLocaleDateString()
+              : "(not set)";
+            const newDate = newValue
+              ? new Date(newValue as Date).toLocaleDateString()
+              : "(not set)";
+            changes.push(`${label}: ${oldDate} → ${newDate}`);
+          } else {
+            changes.push(`${label}: ${oldDisplay} → ${newDisplay}`);
+          }
+        }
+      }
+
       const lead = await ctx.db.lead.update({
         where: { id },
         data: {
@@ -261,13 +321,30 @@ export const leadRouter = createTRPCRouter({
         },
       });
 
-      // Create activity for status change
+      // Create activity for status change (separate from general edit)
       if (currentLead && data.status && currentLead.status !== data.status) {
         await ctx.db.activity.create({
           data: {
             type: "STATUS_CHANGE",
             subject: "Status changed",
             description: `Status changed from ${currentLead.status} to ${data.status}`,
+            leadId: lead.id,
+            userId: ctx.session.user.id,
+            workspaceId: ctx.workspaceId,
+          },
+        });
+      }
+
+      // Create activity for general field edits (if there are non-status changes)
+      const nonStatusChanges = changes.filter(
+        (change) => !change.startsWith("Status:"),
+      );
+      if (nonStatusChanges.length > 0) {
+        await ctx.db.activity.create({
+          data: {
+            type: "EDIT",
+            subject: "Lead information updated",
+            description: nonStatusChanges.join(", "),
             leadId: lead.id,
             userId: ctx.session.user.id,
             workspaceId: ctx.workspaceId,
@@ -672,22 +749,38 @@ export const leadRouter = createTRPCRouter({
         });
       }
 
+      // Track changes
+      const changes: string[] = [];
+      if (data.revenue !== undefined && existingLead.revenue !== data.revenue) {
+        changes.push(`Revenue: ${existingLead.revenue || 0} → ${data.revenue}`);
+      }
+      if (
+        data.feedbackNeeded !== undefined &&
+        existingLead.feedbackNeeded !== data.feedbackNeeded
+      ) {
+        changes.push(
+          `Feedback Needed: ${existingLead.feedbackNeeded ? "Yes" : "No"} → ${data.feedbackNeeded ? "Yes" : "No"}`,
+        );
+      }
+
       const lead = await ctx.db.lead.update({
         where: { id },
         data,
       });
 
-      // Log activity
-      await ctx.db.activity.create({
-        data: {
-          leadId: id,
-          userId: ctx.session.user.id,
-          type: "EDIT",
-          subject: "Quick fields updated",
-          message: "Quick fields updated (revenue/feedback)",
-          workspaceId: ctx.workspaceId,
-        },
-      });
+      // Log activity only if there are actual changes
+      if (changes.length > 0) {
+        await ctx.db.activity.create({
+          data: {
+            leadId: id,
+            userId: ctx.session.user.id,
+            type: "EDIT",
+            subject: "Lead updated",
+            description: changes.join(", "),
+            workspaceId: ctx.workspaceId,
+          },
+        });
+      }
 
       return lead;
     }),

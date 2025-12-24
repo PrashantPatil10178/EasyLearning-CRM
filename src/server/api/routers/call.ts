@@ -263,4 +263,141 @@ export const callLogRouter = createTRPCRouter({
       completedToday,
     };
   }),
+
+  // Complete a call and log activities
+  complete: protectedWorkspaceProcedure
+    .input(
+      z.object({
+        leadId: z.string(),
+        outcome: z.enum([
+          "ANSWERED",
+          "NO_ANSWER",
+          "BUSY",
+          "VOICEMAIL",
+          "FAILED",
+        ]),
+        notes: z.string(),
+        duration: z.number().optional(),
+        newStatus: z.string().optional(),
+        nextFollowUp: z.date().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify lead belongs to workspace
+      const lead = await ctx.db.lead.findUnique({
+        where: { id: input.leadId },
+        select: {
+          id: true,
+          workspaceId: true,
+          name: true,
+          status: true,
+          phone: true,
+        },
+      });
+
+      if (!lead) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Lead not found",
+        });
+      }
+
+      if (lead.workspaceId !== ctx.workspaceId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Lead does not belong to your workspace",
+        });
+      }
+
+      // Get user details
+      const user = await ctx.db.user.findUnique({
+        where: { id: ctx.session.user.id },
+        select: { name: true, phone: true },
+      });
+
+      // Create call record
+      const call = await ctx.db.call.create({
+        data: {
+          leadId: input.leadId,
+          userId: ctx.session.user.id,
+          workspaceId: ctx.workspaceId,
+          type: "OUTBOUND",
+          status: "COMPLETED",
+          outcome: input.outcome,
+          notes: input.notes,
+          duration: input.duration,
+          toNumber: lead.phone || "",
+          fromNumber: user?.phone || "",
+          nextFollowUp: input.nextFollowUp,
+        },
+      });
+
+      // Create call activity
+      await ctx.db.activity.create({
+        data: {
+          type: "CALL",
+          subject: `${input.outcome === "ANSWERED" ? "Call Answered" : "Call Attempted"}`,
+          description: input.notes,
+          message: `Call ${input.outcome.toLowerCase().replace("_", " ")}${input.duration ? ` - Duration: ${Math.floor(input.duration / 60)}m ${input.duration % 60}s` : ""}`,
+          leadId: input.leadId,
+          userId: ctx.session.user.id,
+          workspaceId: ctx.workspaceId,
+          performedAt: new Date(),
+        },
+      });
+
+      // Update lead status if changed
+      if (input.newStatus && input.newStatus !== lead.status) {
+        await ctx.db.lead.update({
+          where: { id: input.leadId },
+          data: { status: input.newStatus as any },
+        });
+
+        // Log status change activity
+        await ctx.db.activity.create({
+          data: {
+            type: "STATUS_CHANGE",
+            subject: "Status changed",
+            description: `Status changed from ${lead.status} to ${input.newStatus}`,
+            message: `${user?.name || "User"} changed status from ${lead.status} to ${input.newStatus}`,
+            leadId: input.leadId,
+            userId: ctx.session.user.id,
+            workspaceId: ctx.workspaceId,
+            performedAt: new Date(),
+          },
+        });
+      }
+
+      // Create follow-up task if scheduled
+      if (input.nextFollowUp) {
+        await ctx.db.task.create({
+          data: {
+            title: `Follow up call with ${lead.name}`,
+            description: `Scheduled follow-up from call on ${new Date().toLocaleDateString()}`,
+            status: "TODO",
+            priority: "MEDIUM",
+            dueDate: input.nextFollowUp,
+            leadId: input.leadId,
+            assignedToId: ctx.session.user.id,
+            workspaceId: ctx.workspaceId,
+          },
+        });
+
+        // Log follow-up scheduled activity
+        await ctx.db.activity.create({
+          data: {
+            type: "FOLLOW_UP_SCHEDULED",
+            subject: "Follow-up scheduled",
+            description: `Follow-up call scheduled for ${input.nextFollowUp.toLocaleString()}`,
+            message: `${user?.name || "User"} scheduled a follow-up call`,
+            leadId: input.leadId,
+            userId: ctx.session.user.id,
+            workspaceId: ctx.workspaceId,
+            performedAt: new Date(),
+          },
+        });
+      }
+
+      return { success: true, callId: call.id };
+    }),
 });

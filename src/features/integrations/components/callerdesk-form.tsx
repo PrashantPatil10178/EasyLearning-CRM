@@ -71,6 +71,8 @@ export function CallerDeskForm() {
     admin: 0,
     regular: 0,
   });
+  const [ivrNumbers, setIvrNumbers] = useState<any[]>([]);
+  const [isLoadingIVR, setIsLoadingIVR] = useState(false);
 
   const { data: integration, isLoading } = api.integration.get.useQuery({
     provider: "CALLERDESK",
@@ -122,6 +124,29 @@ export function CallerDeskForm() {
       setAddingMemberId(null);
     },
   });
+
+  const updateUserDeskphoneMutation = api.user.updateDeskphone.useMutation({
+    onSuccess: () => {
+      toast.success("Deskphone updated successfully");
+      utils.user.getAll.invalidate();
+    },
+    onError: (error) => {
+      toast.error("Failed to update deskphone");
+    },
+  });
+
+  const getIVRNumbersMutation =
+    api.integration.getCallerDeskIVRNumbers.useMutation({
+      onSuccess: (data) => {
+        if (data && data.getdeskphone) {
+          setIvrNumbers(data.getdeskphone);
+          toast.success(`Fetched ${data.getdeskphone.length} IVR numbers`);
+        }
+      },
+      onError: (error) => {
+        toast.error("Failed to fetch IVR numbers");
+      },
+    });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -184,6 +209,13 @@ export function CallerDeskForm() {
       isEnabled: values.isEnabled,
     });
   }
+
+  const handleFetchIVR = () => {
+    setIsLoadingIVR(true);
+    getIVRNumbersMutation.mutate(undefined, {
+      onSettled: () => setIsLoadingIVR(false),
+    });
+  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -272,11 +304,44 @@ export function CallerDeskForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Desk Phone *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., +91xxxxxxxxxx" {...field} />
-                  </FormControl>
+                  <div className="flex gap-2">
+                    <FormControl>
+                      <Input placeholder="e.g., +91xxxxxxxxxx" {...field} />
+                    </FormControl>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={handleFetchIVR}
+                      disabled={isLoadingIVR || !apiKey}
+                      title="Fetch IVR Numbers"
+                    >
+                      {isLoadingIVR ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  {ivrNumbers.length > 0 && (
+                    <div className="mt-2">
+                      <select
+                        className="border-input bg-background ring-offset-background focus:ring-ring w-full rounded-md border px-3 py-2 text-sm focus:ring-2 focus:ring-offset-2 focus:outline-none"
+                        onChange={(e) => field.onChange(e.target.value)}
+                        value={field.value}
+                      >
+                        <option value="">Select an IVR Number</option>
+                        {ivrNumbers.map((ivr: any) => (
+                          <option key={ivr.deskphone} value={ivr.deskphone}>
+                            {ivr.deskphone}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <FormDescription>
-                    Phone number for outgoing calls
+                    Phone number for outgoing calls. Fetch from CallerDesk to
+                    select.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -650,6 +715,93 @@ export function CallerDeskForm() {
             </TableBody>
           </Table>
         </div>
+      </div>
+
+      {/* User-Deskphone Mapping Section */}
+      <div className="mt-8">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <PhoneCall className="h-5 w-5" />
+                  User Deskphone Mapping
+                </CardTitle>
+                <CardDescription>
+                  Assign CallerDesk IVR numbers to your team members
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleFetchIVR}
+                disabled={isLoadingIVR || !apiKey}
+              >
+                {isLoadingIVR ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                Fetch IVR Numbers
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {users && users.length > 0 ? (
+              <div className="space-y-4">
+                {users.map((user) => (
+                  <div
+                    key={user.id}
+                    className="flex items-center justify-between rounded-lg border p-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar>
+                        <AvatarImage src={user.image || ""} />
+                        <AvatarFallback>
+                          {user.name?.slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="font-medium">{user.name}</div>
+                        <div className="text-muted-foreground text-sm">
+                          {user.email || user.phone}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <select
+                        className="border-input bg-background w-48 rounded-md border px-3 py-2 text-sm"
+                        value={user.callerDeskPhone || ""}
+                        onChange={(e) => {
+                          updateUserDeskphoneMutation.mutate({
+                            userId: user.id,
+                            deskphone: e.target.value || null,
+                          });
+                        }}
+                      >
+                        <option value="">No Deskphone Assigned</option>
+                        {ivrNumbers.map((ivr: any) => (
+                          <option key={ivr.deskphone} value={ivr.deskphone}>
+                            {ivr.deskphone}
+                          </option>
+                        ))}
+                      </select>
+                      <Badge
+                        variant={user.callerDeskPhone ? "default" : "secondary"}
+                      >
+                        {user.callerDeskPhone ? "Assigned" : "Not Assigned"}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-muted-foreground py-8 text-center">
+                No users found in workspace
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
