@@ -538,6 +538,7 @@ export const leadRouter = createTRPCRouter({
             campaign: z.string().optional(),
             nextFollowUp: z.string().optional(),
             customFields: z.string().optional(),
+            ownerId: z.string().optional(), // Add ownerId support
           }),
         ),
         assignToMe: z.boolean().default(false),
@@ -549,13 +550,33 @@ export const leadRouter = createTRPCRouter({
       const userId = ctx.session.user.id;
 
       const createdLeads = await Promise.all(
-        leads.map((lead) =>
-          ctx.db.lead.create({
+        leads.map((lead) => {
+          // Determine the owner ID
+          let ownerId = null;
+
+          // Priority: 1. lead.ownerId (from CSV "Assign To" column)
+          //           2. assignToMe flag
+          //           3. autoAssign flag (future feature)
+          if (lead.ownerId) {
+            ownerId = lead.ownerId;
+          } else if (assignToMe) {
+            ownerId = userId;
+          }
+
+          return ctx.db.lead.create({
             data: {
-              ...lead,
+              firstName: lead.firstName,
+              lastName: lead.lastName || null,
+              email: lead.email || null,
+              phone: lead.phone,
+              altPhone: lead.altPhone || null,
               source: (lead.source || "OTHER") as never,
               status: (lead.status || "NEW") as never,
               priority: (lead.priority || "MEDIUM") as never,
+              courseInterested: lead.courseInterested || null,
+              city: lead.city || null,
+              state: lead.state || null,
+              tags: lead.tags || null,
               campaign: lead.campaign || null,
               nextFollowUp: lead.nextFollowUp
                 ? new Date(lead.nextFollowUp)
@@ -563,14 +584,14 @@ export const leadRouter = createTRPCRouter({
               customFields: lead.customFields || null,
               createdById: userId,
               workspaceId: ctx.workspaceId,
-              ...(assignToMe && {
-                ownerId: userId,
+              ...(ownerId && {
+                ownerId: ownerId,
                 assignedAt: new Date(),
                 assignedBy: userId,
               }),
             },
-          }),
-        ),
+          });
+        }),
       );
 
       return { success: true, count: createdLeads.length };

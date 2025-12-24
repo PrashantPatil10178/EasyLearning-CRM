@@ -261,7 +261,7 @@ export function ImportLeadsDialog() {
       "Priority",
       "Campaign",
       "Next Follow-up",
-      "Assign To",
+      "Assign To (User ID)",
     ];
 
     // Add custom field keys
@@ -273,7 +273,9 @@ export function ImportLeadsDialog() {
       });
     }
 
-    // Create sample row
+    // Create sample row with example user ID from first available user
+    const exampleUserId =
+      users && users.length > 0 ? users[0]!.id : "user_id_here";
     const sampleRow = [
       "John",
       "Doe",
@@ -283,6 +285,9 @@ export function ImportLeadsDialog() {
       "WEBSITE",
       "NEW",
       "MEDIUM",
+      "",
+      "",
+      exampleUserId, // Add example user ID
     ];
 
     // Add empty values for custom fields in sample row
@@ -296,7 +301,19 @@ export function ImportLeadsDialog() {
       });
     }
 
-    const csvContent = [headers.join(","), sampleRow.join(",")].join("\n");
+    // Create CSV content with comments
+    let csvContent = headers.join(",") + "\n";
+
+    // Add user reference as comment
+    if (users && users.length > 0) {
+      csvContent += "# Available Users (for 'Assign To' column):\n";
+      users.forEach((user) => {
+        csvContent += `# ${user.id} - ${user.name || user.email}\n`;
+      });
+      csvContent += "#\n";
+    }
+
+    csvContent += sampleRow.join(",");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
