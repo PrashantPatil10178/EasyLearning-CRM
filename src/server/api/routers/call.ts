@@ -289,7 +289,8 @@ export const callLogRouter = createTRPCRouter({
         select: {
           id: true,
           workspaceId: true,
-          name: true,
+          firstName: true,
+          lastName: true,
           status: true,
           phone: true,
         },
@@ -315,6 +316,17 @@ export const callLogRouter = createTRPCRouter({
         select: { name: true, phone: true },
       });
 
+      // Map the outcome to CallStatus
+      const statusMap: Record<string, string> = {
+        ANSWERED: "COMPLETED",
+        NO_ANSWER: "NO_ANSWER",
+        BUSY: "BUSY",
+        VOICEMAIL: "VOICEMAIL",
+        FAILED: "FAILED",
+      };
+
+      const callStatus = statusMap[input.outcome] || "COMPLETED";
+
       // Create call record
       const call = await ctx.db.call.create({
         data: {
@@ -322,8 +334,8 @@ export const callLogRouter = createTRPCRouter({
           userId: ctx.session.user.id,
           workspaceId: ctx.workspaceId,
           type: "OUTBOUND",
-          status: "COMPLETED",
-          outcome: input.outcome,
+          status: callStatus as any,
+          outcome: null, // outcome is for customer interest level, not call connection status
           notes: input.notes,
           duration: input.duration,
           toNumber: lead.phone || "",
@@ -372,13 +384,15 @@ export const callLogRouter = createTRPCRouter({
       if (input.nextFollowUp) {
         await ctx.db.task.create({
           data: {
-            title: `Follow up call with ${lead.name}`,
+            title:
+              `Follow up call with ${lead.firstName} ${lead.lastName || ""}`.trim(),
             description: `Scheduled follow-up from call on ${new Date().toLocaleDateString()}`,
-            status: "TODO",
+            status: "PENDING",
             priority: "MEDIUM",
             dueDate: input.nextFollowUp,
             leadId: input.leadId,
-            assignedToId: ctx.session.user.id,
+            assigneeId: ctx.session.user.id,
+            createdById: ctx.session.user.id,
             workspaceId: ctx.workspaceId,
           },
         });

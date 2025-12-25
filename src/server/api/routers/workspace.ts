@@ -32,7 +32,8 @@ export const workspaceRouter = createTRPCRouter({
           .regex(
             /^[a-z0-9-]+$/,
             "Slug must be lowercase alphanumeric with hyphens",
-          ),
+          )
+          .optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -45,23 +46,43 @@ export const workspaceRouter = createTRPCRouter({
         });
       }
 
-      // Check if slug exists
-      const existing = await ctx.db.workspace.findUnique({
-        where: { slug: input.slug },
-      });
+      // Auto-generate slug if not provided
+      let slug = input.slug;
+      if (!slug) {
+        slug = input.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "");
 
-      if (existing) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "Workspace URL already taken",
+        // Ensure uniqueness by appending a number if needed
+        let counter = 1;
+        let uniqueSlug = slug;
+        while (
+          await ctx.db.workspace.findUnique({ where: { slug: uniqueSlug } })
+        ) {
+          uniqueSlug = `${slug}-${counter}`;
+          counter++;
+        }
+        slug = uniqueSlug;
+      } else {
+        // Check if slug exists
+        const existing = await ctx.db.workspace.findUnique({
+          where: { slug },
         });
+
+        if (existing) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Workspace URL already taken",
+          });
+        }
       }
 
       // Create workspace and add creator as ADMIN
       const workspace = await ctx.db.workspace.create({
         data: {
           name: input.name,
-          slug: input.slug,
+          slug,
           members: {
             create: {
               userId: ctx.session.user.id,

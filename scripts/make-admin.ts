@@ -6,8 +6,8 @@ const prisma = new PrismaClient();
 async function makeAdmin() {
   try {
     const phone = "7620170904";
-    const name = "Prashant Patil";
-    const email = "prashant@easylearning.com";
+    const name = "Shubham Jha";
+    const email = "shubham@easylearning.live";
     const password = "admin123";
 
     // Hash the password

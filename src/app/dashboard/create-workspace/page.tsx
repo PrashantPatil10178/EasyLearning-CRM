@@ -37,7 +37,12 @@ export default function CreateWorkspacePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createWorkspace.mutate({ name, slug });
+    // Only send slug if user has entered one
+    const payload: { name: string; slug?: string } = { name };
+    if (slug.trim()) {
+      payload.slug = slug;
+    }
+    createWorkspace.mutate(payload);
   };
 
   return (
@@ -92,7 +97,12 @@ export default function CreateWorkspacePage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="slug">Workspace URL</Label>
+                <Label htmlFor="slug">
+                  Workspace URL{" "}
+                  <span className="text-muted-foreground text-xs">
+                    (Optional)
+                  </span>
+                </Label>
                 <div className="ring-offset-background focus-within:ring-ring flex rounded-md shadow-sm focus-within:ring-2 focus-within:ring-offset-2">
                   <span className="bg-muted text-muted-foreground flex items-center rounded-l-md border border-r-0 px-3 text-sm select-none">
                     app.crm.com/
@@ -102,14 +112,13 @@ export default function CreateWorkspacePage() {
                     placeholder="acme-corp"
                     value={slug}
                     onChange={(e) => setSlug(e.target.value)}
-                    required
                     pattern="^[a-z0-9-]+$"
                     title="Lowercase alphanumeric with hyphens only"
                     className="rounded-l-none"
                   />
                 </div>
                 <p className="text-muted-foreground text-xs">
-                  This will be the unique URL for your workspace.
+                  Leave blank to auto-generate from workspace name.
                 </p>
               </div>
             </CardContent>
