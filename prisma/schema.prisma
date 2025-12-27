@@ -75,6 +75,7 @@ model User {
   
   // Workspace Relations
   workspaces       WorkspaceMember[]
+  webhookAssignmentRules WebhookAssignmentRule[]
 
   // Team Relations
   teamId           String?
@@ -128,6 +129,9 @@ model Workspace {
   // Settings
   settings    String?  // JSON settings
   
+  // Webhook Security
+  webhookToken String? @unique // Unique token for webhook authentication
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -149,6 +153,7 @@ model Workspace {
   whatsappTriggers WhatsAppTrigger[]
   leadFields  LeadField[]
   deals       Deal[]
+  webhookAssignmentRules WebhookAssignmentRule[]
 
   @@map("workspaces")
 }
@@ -339,6 +344,7 @@ enum LeadSource {
   EMAIL_CAMPAIGN
   EXHIBITION
   PARTNER
+  WEBHOOK
   OTHER
 }
 
@@ -924,4 +930,36 @@ model Integration {
   @@unique([workspaceId, provider])
   @@index([workspaceId])
   @@map("integrations")
+}
+
+// Webhook Assignment Rules
+model WebhookAssignmentRule {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  // Rule conditions (all optional, acts as filters)
+  source      String?  // Can be enum values (WEBSITE, FACEBOOK, etc.) or custom strings
+  status      String?  // NEW, CONTACTED, etc.
+  priority    Int      @default(0) // Rule execution priority (lower = higher priority)
+  
+  // Assignment strategy
+  assignmentType String @default("SPECIFIC") // SPECIFIC, ROUND_ROBIN, PERCENTAGE
+  percentage     Int?   // For percentage-based assignment (0-100)
+  
+  // Assignment
+  assigneeId  String
+  assignee    User     @relation(fields: [assigneeId], references: [id], onDelete: Cascade)
+  
+  // Round robin tracking
+  lastAssignedAt DateTime?
+  assignmentCount Int @default(0)
+  
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([assigneeId])
+  @@map("webhook_assignment_rules")
 }

@@ -45,6 +45,15 @@ import {
   ListTodo,
   History,
   Megaphone,
+  Building,
+  DollarSign,
+  Tag,
+  Users,
+  Star,
+  TrendingUp,
+  Activity,
+  FileText,
+  MoreHorizontal,
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -53,6 +62,12 @@ import PageContainer from "@/components/layout/page-container";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function LeadDetailPage() {
   const params = useParams();
@@ -126,7 +141,10 @@ export default function LeadDetailPage() {
     return (
       <PageContainer>
         <div className="flex h-[calc(100vh-200px)] items-center justify-center">
-          <Loader2 className="text-primary h-8 w-8 animate-spin" />
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="text-primary h-12 w-12 animate-spin" />
+            <p className="text-muted-foreground">Loading lead details...</p>
+          </div>
         </div>
       </PageContainer>
     );
@@ -188,13 +206,26 @@ export default function LeadDetailPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "NEW":
-        return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+        return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800";
       case "WON":
-        return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+        return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800";
       case "LOST":
-        return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+        return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800";
       default:
-        return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+        return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700";
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "NEW":
+        return <Activity className="h-3 w-3" />;
+      case "WON":
+        return <CheckCircle2 className="h-3 w-3" />;
+      case "LOST":
+        return <AlertCircle className="h-3 w-3" />;
+      default:
+        return <Clock className="h-3 w-3" />;
     }
   };
 
@@ -206,7 +237,7 @@ export default function LeadDetailPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="w-fit gap-2 pl-0"
+            className="w-fit gap-2 pl-0 hover:bg-transparent"
             asChild
           >
             <Link href="/dashboard/leads">
@@ -248,7 +279,7 @@ export default function LeadDetailPage() {
                 }
               }}
               disabled={isCallingCallerDesk}
-              className="gap-2"
+              className="gap-2 border-green-200 bg-green-50 text-green-700 hover:bg-green-100 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30"
             >
               {isCallingCallerDesk ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -269,27 +300,58 @@ export default function LeadDetailPage() {
                 Edit Lead
               </Link>
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <MoreHorizontal className="h-4 w-4" />
+                  More
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Export to PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Users className="mr-2 h-4 w-4" />
+                  Assign to Team
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Tag className="mr-2 h-4 w-4" />
+                  Add Tags
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
         {/* Header Card */}
-        <Card className="bg-primary/5 overflow-hidden border-none shadow-md">
-          <div className="p-6">
+        <Card className="overflow-hidden border-0 py-0 shadow-lg">
+          <div className="from-primary/10 to-primary/5 bg-gradient-to-r p-6">
             <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
               <div className="flex items-start gap-4">
-                <Avatar className="h-16 w-16 border-2 border-white shadow-sm">
-                  <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
-                    {getInitials(lead.firstName, lead.lastName || "")}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="space-y-1">
+                <div className="relative">
+                  <Avatar className="h-20 w-20 border-4 border-white shadow-md">
+                    <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
+                      {getInitials(lead.firstName, lead.lastName || "")}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute -right-1 -bottom-1 rounded-full bg-white p-1 shadow-md">
+                    <div
+                      className={`rounded-full p-1 ${getStatusColor(lead.status)}`}
+                    >
+                      {getStatusIcon(lead.status)}
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
                   <h1 className="text-2xl font-bold tracking-tight">
                     {lead.firstName} {lead.lastName}
                   </h1>
                   <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
                     <Badge
                       variant="secondary"
-                      className={getStatusColor(lead.status)}
+                      className={`${getStatusColor(lead.status)} border`}
                     >
                       {lead.status}
                     </Badge>
@@ -308,17 +370,29 @@ export default function LeadDetailPage() {
                       </>
                     )}
                   </div>
+                  {(lead.city || lead.state) && (
+                    <div className="text-muted-foreground flex items-center gap-1 text-sm">
+                      <MapPin className="h-3.5 w-3.5" />
+                      {[lead.city, lead.state].filter(Boolean).join(", ")}
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="text-muted-foreground flex flex-col gap-2 text-right text-sm md:items-end">
-                <div className="flex items-center gap-1">
+              <div className="flex flex-col items-end gap-2 text-sm">
+                <div className="text-muted-foreground flex items-center gap-1">
                   <Clock className="h-3.5 w-3.5" />
                   Created {format(new Date(lead.createdAt), "MMM d, yyyy")}
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="text-muted-foreground flex items-center gap-1">
                   <User className="h-3.5 w-3.5" />
                   Owner: {lead.owner?.name || "Unassigned"}
                 </div>
+                {(lead as any).revenue && (
+                  <div className="flex items-center gap-1 font-medium text-green-600">
+                    <DollarSign className="h-3.5 w-3.5" />
+                    Revenue: ₹{(lead as any).revenue.toLocaleString()}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -329,27 +403,44 @@ export default function LeadDetailPage() {
           <div className="space-y-6 lg:col-span-2">
             <Tabs defaultValue="activity" className="w-full">
               <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
-                <TabsTrigger value="activity">Activity</TabsTrigger>
-                <TabsTrigger value="tasks">Tasks</TabsTrigger>
-                <TabsTrigger value="notes">Notes</TabsTrigger>
-                <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
+                <TabsTrigger value="activity" className="gap-2">
+                  <Activity className="h-4 w-4" />
+                  Activity
+                </TabsTrigger>
+                <TabsTrigger value="tasks" className="gap-2">
+                  <ListTodo className="h-4 w-4" />
+                  Tasks
+                </TabsTrigger>
+                <TabsTrigger value="notes" className="gap-2">
+                  <StickyNote className="h-4 w-4" />
+                  Notes
+                </TabsTrigger>
+                <TabsTrigger value="campaigns" className="gap-2">
+                  <Megaphone className="h-4 w-4" />
+                  Campaigns
+                </TabsTrigger>
               </TabsList>
 
               {/* Activity Tab */}
-              <TabsContent value="activity" className="mt-4 space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <History className="h-4 w-4" />
+              <TabsContent value="activity" className="mt-6 space-y-4">
+                <Card className="shadow-md">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <History className="h-5 w-5" />
                       Timeline
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ScrollArea className="h-[500px] pr-4">
                       {activities.length === 0 ? (
-                        <div className="text-muted-foreground flex flex-col items-center justify-center py-8 text-center">
-                          <History className="mb-2 h-8 w-8 opacity-20" />
-                          <p>No activities recorded yet.</p>
+                        <div className="text-muted-foreground flex flex-col items-center justify-center py-12 text-center">
+                          <History className="mb-3 h-12 w-12 opacity-20" />
+                          <p className="text-lg font-medium">
+                            No activities yet
+                          </p>
+                          <p className="text-sm">
+                            Start engaging with this lead to see activity here.
+                          </p>
                         </div>
                       ) : (
                         <div className="border-muted relative ml-4 space-y-8 border-l-2 pl-6 sm:ml-2 sm:space-y-6 sm:pl-6">
@@ -361,38 +452,77 @@ export default function LeadDetailPage() {
                                   return {
                                     color: "bg-green-500",
                                     icon: PhoneCall,
+                                    bgColor: "bg-green-50 dark:bg-green-900/20",
+                                    borderColor:
+                                      "border-green-200 dark:border-green-800",
                                   };
                                 case "EMAIL":
-                                  return { color: "bg-blue-500", icon: Mail };
+                                  return {
+                                    color: "bg-blue-500",
+                                    icon: Mail,
+                                    bgColor: "bg-blue-50 dark:bg-blue-900/20",
+                                    borderColor:
+                                      "border-blue-200 dark:border-blue-800",
+                                  };
                                 case "STATUS_CHANGE":
                                   return {
                                     color: "bg-purple-500",
                                     icon: CheckCircle2,
+                                    bgColor:
+                                      "bg-purple-50 dark:bg-purple-900/20",
+                                    borderColor:
+                                      "border-purple-200 dark:border-purple-800",
                                   };
                                 case "EDIT":
-                                  return { color: "bg-orange-500", icon: Edit };
+                                  return {
+                                    color: "bg-orange-500",
+                                    icon: Edit,
+                                    bgColor:
+                                      "bg-orange-50 dark:bg-orange-900/20",
+                                    borderColor:
+                                      "border-orange-200 dark:border-orange-800",
+                                  };
                                 case "NOTE":
                                   return {
                                     color: "bg-yellow-500",
                                     icon: StickyNote,
+                                    bgColor:
+                                      "bg-yellow-50 dark:bg-yellow-900/20",
+                                    borderColor:
+                                      "border-yellow-200 dark:border-yellow-800",
                                   };
                                 case "FOLLOW_UP_SCHEDULED":
                                   return {
                                     color: "bg-blue-500",
                                     icon: Calendar,
+                                    bgColor: "bg-blue-50 dark:bg-blue-900/20",
+                                    borderColor:
+                                      "border-blue-200 dark:border-blue-800",
                                   };
                                 case "TASK_COMPLETED":
                                   return {
                                     color: "bg-green-500",
                                     icon: CheckCircle2,
+                                    bgColor: "bg-green-50 dark:bg-green-900/20",
+                                    borderColor:
+                                      "border-green-200 dark:border-green-800",
                                   };
                                 default:
-                                  return { color: "bg-primary", icon: Clock };
+                                  return {
+                                    color: "bg-primary",
+                                    icon: Clock,
+                                    bgColor: "bg-primary/10",
+                                    borderColor: "border-primary/20",
+                                  };
                               }
                             };
 
-                            const { color, icon: ActivityIcon } =
-                              getActivityStyle(activity.type);
+                            const {
+                              color,
+                              icon: ActivityIcon,
+                              bgColor,
+                              borderColor,
+                            } = getActivityStyle(activity.type);
 
                             return (
                               <div key={activity.id} className="relative">
@@ -403,49 +533,53 @@ export default function LeadDetailPage() {
                                     className={`${color} h-4 w-4 rounded-full sm:h-2 sm:w-2`}
                                   />
                                 </span>
-                                <div className="flex flex-col gap-2 sm:gap-1">
-                                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <ActivityIcon
-                                        className={`h-4 w-4 ${color.replace("bg-", "text-")}`}
-                                      />
-                                      <span className="text-base font-semibold capitalize sm:text-sm">
-                                        {activity.type
-                                          .replace(/_/g, " ")
-                                          .toLowerCase()}
+                                <div
+                                  className={`rounded-lg border p-4 ${bgColor} ${borderColor}`}
+                                >
+                                  <div className="flex flex-col gap-2 sm:gap-1">
+                                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <ActivityIcon
+                                          className={`h-4 w-4 ${color.replace("bg-", "text-")}`}
+                                        />
+                                        <span className="font-medium capitalize">
+                                          {activity.type
+                                            .replace(/_/g, " ")
+                                            .toLowerCase()}
+                                        </span>
+                                      </div>
+                                      <span className="text-muted-foreground text-sm">
+                                        {format(
+                                          new Date(activity.createdAt),
+                                          "MMM d, h:mm a",
+                                        )}
                                       </span>
                                     </div>
-                                    <span className="text-muted-foreground text-sm sm:text-xs">
-                                      {format(
-                                        new Date(activity.createdAt),
-                                        "MMM d, h:mm a",
-                                      )}
-                                    </span>
-                                  </div>
-                                  {activity.subject && (
-                                    <p className="text-sm font-medium">
-                                      {activity.subject}
+                                    {activity.subject && (
+                                      <p className="font-medium">
+                                        {activity.subject}
+                                      </p>
+                                    )}
+                                    <p className="text-muted-foreground leading-relaxed">
+                                      {(activity as any).message ||
+                                        activity.description}
                                     </p>
-                                  )}
-                                  <p className="text-muted-foreground text-base leading-relaxed sm:text-sm">
-                                    {(activity as any).message ||
-                                      activity.description}
-                                  </p>
-                                  {activity.user && (
-                                    <div className="text-muted-foreground mt-2 flex items-center gap-2 text-sm sm:mt-1 sm:gap-1 sm:text-xs">
-                                      <Avatar className="h-6 w-6 sm:h-4 sm:w-4">
-                                        <AvatarImage
-                                          src={activity.user.image || ""}
-                                        />
-                                        <AvatarFallback className="text-xs sm:text-[8px]">
-                                          {getInitials(
-                                            activity.user.name || "",
-                                          )}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      {activity.user.name}
-                                    </div>
-                                  )}
+                                    {activity.user && (
+                                      <div className="text-muted-foreground mt-2 flex items-center gap-2 text-sm">
+                                        <Avatar className="h-6 w-6">
+                                          <AvatarImage
+                                            src={activity.user.image || ""}
+                                          />
+                                          <AvatarFallback className="text-xs">
+                                            {getInitials(
+                                              activity.user.name || "",
+                                            )}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        {activity.user.name}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             );
@@ -458,37 +592,41 @@ export default function LeadDetailPage() {
               </TabsContent>
 
               {/* Tasks Tab */}
-              <TabsContent value="tasks" className="mt-4 space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <ListTodo className="h-4 w-4" />
+              <TabsContent value="tasks" className="mt-6 space-y-4">
+                <Card className="shadow-md">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <ListTodo className="h-5 w-5" />
                       Schedule Follow-up
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label>Due Date & Time</Label>
+                        <Label htmlFor="dueDate">Due Date & Time</Label>
                         <Input
+                          id="dueDate"
                           type="datetime-local"
                           value={taskDueAt}
                           onChange={(e) => setTaskDueAt(e.target.value)}
+                          className="focus:ring-primary/20 transition-all focus:ring-2"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Note</Label>
+                        <Label htmlFor="taskNote">Note</Label>
                         <Input
+                          id="taskNote"
                           placeholder="e.g. Call regarding pricing"
                           value={taskNote}
                           onChange={(e) => setTaskNote(e.target.value)}
+                          className="focus:ring-primary/20 transition-all focus:ring-2"
                         />
                       </div>
                     </div>
                     <Button
                       onClick={handleCreateTask}
                       disabled={createTaskMutation.isPending}
-                      className="w-full sm:w-auto"
+                      className="w-full transition-all sm:w-auto"
                     >
                       {createTaskMutation.isPending ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -501,24 +639,36 @@ export default function LeadDetailPage() {
                 </Card>
 
                 <div className="space-y-3">
-                  <h3 className="text-muted-foreground text-sm font-medium">
+                  <h3 className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
+                    <ListTodo className="h-4 w-4" />
                     Upcoming Tasks
                   </h3>
                   {tasks.length === 0 ? (
-                    <Card className="bg-muted/40 border-dashed">
-                      <CardContent className="text-muted-foreground flex flex-col items-center justify-center py-8 text-center">
-                        <CheckCircle2 className="mb-2 h-8 w-8 opacity-20" />
-                        <p>No pending tasks.</p>
+                    <Card className="bg-muted/40 border-dashed shadow-sm">
+                      <CardContent className="text-muted-foreground flex flex-col items-center justify-center py-12 text-center">
+                        <CheckCircle2 className="mb-3 h-12 w-12 opacity-20" />
+                        <p className="text-lg font-medium">No pending tasks</p>
+                        <p className="text-sm">
+                          Schedule a follow-up to stay on top of this lead.
+                        </p>
                       </CardContent>
                     </Card>
                   ) : (
                     tasks.map((task) => (
-                      <Card key={task.id}>
+                      <Card
+                        key={task.id}
+                        className="shadow-sm transition-all hover:shadow-md"
+                      >
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between gap-4">
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
-                                <Badge variant="outline">{task.status}</Badge>
+                                <Badge
+                                  variant="outline"
+                                  className="font-medium"
+                                >
+                                  {task.status}
+                                </Badge>
                                 <span className="text-sm font-medium">
                                   {(task.dueDate || (task as any).dueAt) &&
                                     format(
@@ -557,11 +707,11 @@ export default function LeadDetailPage() {
               </TabsContent>
 
               {/* Notes Tab */}
-              <TabsContent value="notes" className="mt-4 space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <StickyNote className="h-4 w-4" />
+              <TabsContent value="notes" className="mt-6 space-y-4">
+                <Card className="shadow-md">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <StickyNote className="h-5 w-5" />
                       Add Note
                     </CardTitle>
                   </CardHeader>
@@ -571,11 +721,12 @@ export default function LeadDetailPage() {
                       rows={4}
                       value={note}
                       onChange={(e) => setNote(e.target.value)}
-                      className="resize-none"
+                      className="focus:ring-primary/20 resize-none transition-all focus:ring-2"
                     />
                     <Button
                       onClick={handleAddNote}
                       disabled={addNoteMutation.isPending}
+                      className="transition-all"
                     >
                       {addNoteMutation.isPending ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -589,11 +740,11 @@ export default function LeadDetailPage() {
               </TabsContent>
 
               {/* Campaigns Tab */}
-              <TabsContent value="campaigns" className="mt-4 space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Megaphone className="h-4 w-4" />
+              <TabsContent value="campaigns" className="mt-6 space-y-4">
+                <Card className="shadow-md">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Megaphone className="h-5 w-5" />
                       Active Campaigns
                     </CardTitle>
                     <CardDescription>
@@ -606,7 +757,7 @@ export default function LeadDetailPage() {
                         {lead.campaignLeads.map((cl: any) => (
                           <div
                             key={cl.id}
-                            className="flex items-center justify-between rounded-lg border p-4"
+                            className="flex items-center justify-between rounded-lg border p-4 transition-all hover:shadow-md"
                           >
                             <div className="space-y-1">
                               <Link
@@ -616,7 +767,10 @@ export default function LeadDetailPage() {
                                 {cl.campaign.name}
                               </Link>
                               <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                                <Badge variant="outline">
+                                <Badge
+                                  variant="outline"
+                                  className="font-medium"
+                                >
                                   {cl.campaign.type}
                                 </Badge>
                                 <span>•</span>
@@ -637,6 +791,7 @@ export default function LeadDetailPage() {
                                     ? "secondary"
                                     : "outline"
                               }
+                              className="font-medium"
                             >
                               {cl.status}
                             </Badge>
@@ -644,9 +799,13 @@ export default function LeadDetailPage() {
                         ))}
                       </div>
                     ) : (
-                      <div className="text-muted-foreground flex flex-col items-center justify-center py-8 text-center">
-                        <Megaphone className="mb-2 h-8 w-8 opacity-20" />
-                        <p>This lead is not part of any campaigns yet.</p>
+                      <div className="text-muted-foreground flex flex-col items-center justify-center py-12 text-center">
+                        <Megaphone className="mb-3 h-12 w-12 opacity-20" />
+                        <p className="text-lg font-medium">No campaigns yet</p>
+                        <p className="text-sm">
+                          Add this lead to a campaign to start automated
+                          outreach.
+                        </p>
                         <Button variant="link" className="mt-2" asChild>
                           <Link href="/dashboard/campaigns">
                             Browse Campaigns
@@ -663,9 +822,12 @@ export default function LeadDetailPage() {
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
             {/* Status Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Lead Status</CardTitle>
+            <Card className="shadow-md">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Activity className="h-5 w-5" />
+                  Lead Status
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Select
@@ -675,7 +837,7 @@ export default function LeadDetailPage() {
                     handleStatusUpdate(value);
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="focus:ring-primary/20 transition-all focus:ring-2">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -692,7 +854,7 @@ export default function LeadDetailPage() {
                 <Separator />
 
                 <div className="space-y-3">
-                  <Label>Quick Actions</Label>
+                  <Label className="font-medium">Quick Actions</Label>
                   <div className="space-y-2">
                     <div className="space-y-1">
                       <Label className="text-muted-foreground text-xs">
@@ -704,6 +866,7 @@ export default function LeadDetailPage() {
                         value={revenue || (lead as any).revenue || ""}
                         onChange={(e) => setRevenue(e.target.value)}
                         placeholder="0.00"
+                        className="focus:ring-primary/20 transition-all focus:ring-2"
                       />
                     </div>
                     <div className="flex items-center space-x-2 pt-2">
@@ -716,7 +879,7 @@ export default function LeadDetailPage() {
                       />
                       <Label
                         htmlFor="feedback"
-                        className="cursor-pointer text-sm"
+                        className="cursor-pointer text-sm font-medium"
                       >
                         Feedback Needed
                       </Label>
@@ -724,7 +887,7 @@ export default function LeadDetailPage() {
                     <Button
                       onClick={handleQuickSave}
                       disabled={quickSaveMutation.isPending}
-                      className="w-full"
+                      className="w-full transition-all"
                       variant="secondary"
                     >
                       {quickSaveMutation.isPending ? (
@@ -740,9 +903,12 @@ export default function LeadDetailPage() {
             </Card>
 
             {/* Lead Info Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Lead Information</CardTitle>
+            <Card className="shadow-md">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Tag className="h-5 w-5" />
+                  Lead Information
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 text-sm">
                 <div className="grid grid-cols-2 gap-2">
@@ -788,9 +954,12 @@ export default function LeadDetailPage() {
             </Card>
 
             {/* Contact Info Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Contact Details</CardTitle>
+            <Card className="shadow-md">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Users className="h-5 w-5" />
+                  Contact Details
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 text-sm">
                 <div className="flex items-start gap-3">
@@ -826,6 +995,73 @@ export default function LeadDetailPage() {
                     </div>
                   </div>
                 )}
+                {lead.company && (
+                  <div className="flex items-start gap-3">
+                    <Building className="text-muted-foreground mt-0.5 h-4 w-4" />
+                    <div className="flex flex-col">
+                      <span className="font-medium">{lead.company}</span>
+                      <span className="text-muted-foreground text-xs">
+                        Company
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Performance Metrics */}
+            <Card className="shadow-md">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <TrendingUp className="h-5 w-5" />
+                  Performance
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground text-sm">
+                    Engagement Score
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star
+                        key={star}
+                        className={`h-4 w-4 ${
+                          star <= 3
+                            ? "fill-yellow-400 text-yellow-400"
+                            : "text-gray-300"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground text-sm">
+                    Last Contact
+                  </span>
+                  <span className="text-sm font-medium">
+                    {activities.length > 0
+                      ? format(new Date(activities[0].createdAt), "MMM d, yyyy")
+                      : "Never"}
+                  </span>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground text-sm">
+                    Total Activities
+                  </span>
+                  <span className="text-sm font-medium">
+                    {activities.length}
+                  </span>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground text-sm">
+                    Open Tasks
+                  </span>
+                  <span className="text-sm font-medium">{tasks.length}</span>
+                </div>
               </CardContent>
             </Card>
           </div>

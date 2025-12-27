@@ -258,10 +258,18 @@ export default function AppSidebar() {
                     <DropdownMenuSeparator />
                     <DropdownMenuGroup>
                       <DropdownMenuItem
-                        onClick={() => router.push("/dashboard/organization")}
+                        onClick={() => router.push("/dashboard/webhooks")}
                       >
                         <IconBuilding className="mr-2 h-4 w-4" />
-                        Workspace Settings
+                        Webhooks
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          router.push("/dashboard/workspace-settings")
+                        }
+                      >
+                        <IconBuilding className="mr-2 h-4 w-4" />
+                        Lead Fields
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => router.push("/dashboard/students")}

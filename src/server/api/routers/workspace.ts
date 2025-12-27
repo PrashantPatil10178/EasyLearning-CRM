@@ -1,8 +1,34 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  protectedWorkspaceProcedure,
+} from "@/server/api/trpc";
 import { TRPCError } from "@trpc/server";
+import { randomBytes } from "crypto";
+
+// Helper function to generate webhook token
+function generateWebhookToken(): string {
+  return `whk_${randomBytes(32).toString("hex")}`;
+}
 
 export const workspaceRouter = createTRPCRouter({
+  // Get current workspace details
+  getCurrent: protectedWorkspaceProcedure.query(async ({ ctx }) => {
+    const workspace = await ctx.db.workspace.findUnique({
+      where: { id: ctx.workspaceId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        logo: true,
+        webhookToken: true,
+      },
+    });
+
+    return workspace;
+  }),
+
   // Get all workspaces for the current user
   getAll: protectedProcedure.query(async ({ ctx }) => {
     const members = await ctx.db.workspaceMember.findMany({
@@ -94,4 +120,32 @@ export const workspaceRouter = createTRPCRouter({
 
       return workspace;
     }),
+
+  // Generate webhook token for workspace
+  generateWebhookToken: protectedWorkspaceProcedure.mutation(
+    async ({ ctx }) => {
+      const token = generateWebhookToken();
+
+      const workspace = await ctx.db.workspace.update({
+        where: { id: ctx.workspaceId },
+        data: { webhookToken: token },
+      });
+
+      return { webhookToken: workspace.webhookToken };
+    },
+  ),
+
+  // Regenerate webhook token (invalidates old token)
+  regenerateWebhookToken: protectedWorkspaceProcedure.mutation(
+    async ({ ctx }) => {
+      const token = generateWebhookToken();
+
+      const workspace = await ctx.db.workspace.update({
+        where: { id: ctx.workspaceId },
+        data: { webhookToken: token },
+      });
+
+      return { webhookToken: workspace.webhookToken };
+    },
+  ),
 });

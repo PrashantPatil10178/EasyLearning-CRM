@@ -89,6 +89,12 @@ export const agentNavItems: NavItem[] = [
         shortcut: ["u", "u"],
       },
       {
+        title: "Webhook Settings",
+        url: "/dashboard/workspace-settings",
+        icon: "webhook",
+        shortcut: ["w", "h"],
+      },
+      {
         title: "Settings",
         shortcut: ["s", "s"],
         url: "/dashboard/settings",
@@ -183,6 +189,18 @@ export const managerNavItems: NavItem[] = [
         shortcut: ["u", "u"],
       },
       {
+        title: "Webhooks & Auto-Assign",
+        url: "/dashboard/webhooks",
+        icon: "webhook",
+        shortcut: ["w", "h"],
+      },
+      {
+        title: "Lead Fields",
+        url: "/dashboard/workspace-settings",
+        icon: "settings",
+        shortcut: ["w", "f"],
+      },
+      {
         title: "Settings",
         shortcut: ["s", "s"],
         url: "/dashboard/settings",
@@ -265,10 +283,16 @@ export const adminNavItems: NavItem[] = [
     isActive: true,
     items: [
       {
-        title: "Edit Lead Fields",
+        title: "Webhooks & Auto-Assign",
+        url: "/dashboard/webhooks",
+        icon: "webhook",
+        shortcut: ["w", "h"],
+      },
+      {
+        title: "Lead Fields",
         url: "/dashboard/workspace-settings",
         icon: "settings",
-        shortcut: ["w", "s"],
+        shortcut: ["w", "f"],
       },
     ],
   },

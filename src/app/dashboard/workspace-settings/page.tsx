@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import * as React from "react";
 import PageContainer from "@/components/layout/page-container";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +26,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -58,7 +58,6 @@ import {
   GripVertical,
   Search,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 
 const fieldTypes = [
   {
@@ -124,7 +123,7 @@ const formSchema = z.object({
     "EMAIL",
     "PHONE",
   ]),
-  options: z.string().optional(), // Comma separated for UI, converted to JSON for API
+  options: z.string().optional(),
   isVisible: z.boolean().default(true),
   isRequired: z.boolean().default(false),
 });
@@ -137,6 +136,7 @@ export default function WorkspaceSettingsPage() {
 
   const utils = api.useUtils();
   const { data: fields, isLoading } = api.settings.getLeadFields.useQuery();
+
   const upsertMutation = api.settings.upsertLeadField.useMutation({
     onSuccess: () => {
       toast.success(editingField ? "Field updated" : "Field created");
@@ -241,9 +241,7 @@ export default function WorkspaceSettingsPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">
-              Fields Settings
-            </h2>
+            <h2 className="text-2xl font-bold tracking-tight">Lead Fields</h2>
             <p className="text-muted-foreground">
               Manage custom fields for your leads.
             </p>

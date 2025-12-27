@@ -62,6 +62,7 @@ import {
   IconNote,
   IconClipboard,
   IconPlug,
+  IconWebhook,
 } from "@tabler/icons-react";
 import type { IconProps } from "@tabler/icons-react";
 
@@ -73,6 +74,7 @@ export const Icons = {
   logo: IconCommand,
   kanban: IconLayoutKanban,
   plug: IconPlug,
+  webhook: IconWebhook,
 
   // Navigation
   login: IconLogin,
