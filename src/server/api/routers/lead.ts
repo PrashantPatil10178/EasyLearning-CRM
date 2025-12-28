@@ -10,6 +10,7 @@ export const leadRouter = createTRPCRouter({
   getAll: protectedWorkspaceProcedure
     .input(
       z.object({
+        category: z.string().optional(),
         status: z.string().optional(),
         source: z.string().optional(),
         ownerId: z.string().optional(),
@@ -20,7 +21,16 @@ export const leadRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const { status, source, ownerId, priority, search, page, limit } = input;
+      const {
+        category,
+        status,
+        source,
+        ownerId,
+        priority,
+        search,
+        page,
+        limit,
+      } = input;
       const skip = (page - 1) * limit;
 
       // Check user role - AGENT and VIEWER can only see their own leads
@@ -33,6 +43,7 @@ export const leadRouter = createTRPCRouter({
         ...(isRestrictedUser && { ownerId: ctx.session.user.id }),
         // If ownerId filter is provided and user is admin/manager, apply it
         ...(!isRestrictedUser && ownerId && { ownerId }),
+        ...(category && { category: category as never }),
         ...(status && { status: status as never }),
         ...(source && { source: source as never }),
         ...(priority && { priority: priority as never }),
@@ -147,7 +158,7 @@ export const leadRouter = createTRPCRouter({
         phone: z.string().min(10),
         altPhone: z.string().optional(),
         source: z.string().default("WEBSITE"),
-        status: z.string().default("NEW"),
+        status: z.string().default("NEW_LEAD"),
         priority: z.string().default("MEDIUM"),
         ownerId: z.string().optional(),
         nextFollowUp: z.string().optional(),
@@ -156,6 +167,21 @@ export const leadRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Calculate category based on status
+      const category =
+        input.status === "NEW_LEAD"
+          ? "FRESH"
+          : [
+                "INTERESTED",
+                "JUST_CURIOUS",
+                "FOLLOW_UP",
+                "CONTACTED",
+                "QUALIFIED",
+                "NEGOTIATION",
+              ].includes(input.status)
+            ? "ACTIVE"
+            : "CLOSED";
+
       const lead = await ctx.db.lead.create({
         data: {
           firstName: input.firstName,
@@ -164,6 +190,7 @@ export const leadRouter = createTRPCRouter({
           phone: input.phone,
           altPhone: input.altPhone,
           source: input.source as never,
+          category: category as never,
           status: input.status as never,
           priority: input.priority as never,
           ownerId: input.ownerId || null,
@@ -309,10 +336,27 @@ export const leadRouter = createTRPCRouter({
         }
       }
 
+      // Calculate category if status is being updated
+      const category = data.status
+        ? data.status === "NEW_LEAD"
+          ? "FRESH"
+          : [
+                "INTERESTED",
+                "JUST_CURIOUS",
+                "FOLLOW_UP",
+                "CONTACTED",
+                "QUALIFIED",
+                "NEGOTIATION",
+              ].includes(data.status)
+            ? "ACTIVE"
+            : "CLOSED"
+        : undefined;
+
       const lead = await ctx.db.lead.update({
         where: { id },
         data: {
           ...data,
+          ...(category && { category: category as never }),
           email: data.email || null,
           source: data.source as never,
           status: data.status as never,
@@ -672,7 +716,7 @@ export const leadRouter = createTRPCRouter({
     const [total, newLeads, contacted, qualified, converted, todayFollowUps] =
       await Promise.all([
         ctx.db.lead.count({ where: whereCondition }),
-        ctx.db.lead.count({ where: { ...whereCondition, status: "NEW" } }),
+        ctx.db.lead.count({ where: { ...whereCondition, status: "NEW_LEAD" } }),
         ctx.db.lead.count({
           where: { ...whereCondition, status: "CONTACTED" },
         }),
@@ -724,9 +768,25 @@ export const leadRouter = createTRPCRouter({
         });
       }
 
+      // Calculate category based on new status
+      const category =
+        input.status === "NEW_LEAD"
+          ? "FRESH"
+          : [
+                "INTERESTED",
+                "JUST_CURIOUS",
+                "FOLLOW_UP",
+                "CONTACTED",
+                "QUALIFIED",
+                "NEGOTIATION",
+              ].includes(input.status)
+            ? "ACTIVE"
+            : "CLOSED";
+
       const lead = await ctx.db.lead.update({
         where: { id: input.id },
         data: {
+          category: category as never,
           status: input.status as never,
           ...(input.status === "CONVERTED" && { convertedAt: new Date() }),
         },
@@ -743,6 +803,18 @@ export const leadRouter = createTRPCRouter({
           workspaceId: ctx.workspaceId,
         },
       });
+
+      // 🔥 Trigger WhatsApp on status change (matches PHP implementation)
+      const { triggerWhatsAppOnStatus } = await import(
+        "@/server/services/whatsapp-trigger"
+      );
+      await triggerWhatsAppOnStatus(
+        ctx.db,
+        input.id,
+        ctx.session.user.id,
+        input.status,
+        ctx.workspaceId,
+      );
 
       return lead;
     }),

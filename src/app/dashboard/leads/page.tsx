@@ -66,6 +66,14 @@ import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
 import { ImportLeadsDialog } from "@/components/leads/import-leads-dialog";
 import { LeadStatusUpdateDialog } from "@/components/leads/lead-status-update-dialog";
 import { toast } from "sonner";
+import {
+  LEAD_STATUS_HIERARCHY,
+  statusStyles,
+  categoryStyles,
+  statusDisplayNames,
+  type LeadCategory,
+  type LeadStatus,
+} from "@/lib/lead-status";
 
 const priorityStyles: Record<string, string> = {
   LOW: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
@@ -74,33 +82,13 @@ const priorityStyles: Record<string, string> = {
   URGENT: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
-const statusStyles: Record<string, string> = {
-  NEW: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  CONTACTED:
-    "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  INTERESTED:
-    "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  NOT_INTERESTED:
-    "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-  FOLLOW_UP:
-    "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  QUALIFIED:
-    "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  NEGOTIATION:
-    "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
-  CONVERTED:
-    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-  LOST: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  WON: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  DONE: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
-};
-
 export default function LeadsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
@@ -117,6 +105,7 @@ export default function LeadsPage() {
     page,
     limit,
     search: searchQuery || undefined,
+    category: categoryFilter !== "all" ? categoryFilter : undefined,
     status: statusFilter !== "all" ? statusFilter : undefined,
     priority: priorityFilter !== "all" ? priorityFilter : undefined,
     source: sourceFilter !== "all" ? sourceFilter : undefined,
@@ -182,6 +171,7 @@ export default function LeadsPage() {
   };
 
   const clearFilters = () => {
+    setCategoryFilter("all");
     setStatusFilter("all");
     setPriorityFilter("all");
     setSourceFilter("all");
@@ -190,6 +180,7 @@ export default function LeadsPage() {
   };
 
   const hasActiveFilters =
+    categoryFilter !== "all" ||
     statusFilter !== "all" ||
     priorityFilter !== "all" ||
     sourceFilter !== "all" ||
@@ -349,7 +340,29 @@ export default function LeadsPage() {
               </div>
 
               {showFilters && (
-                <div className="grid gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Category</label>
+                    <Select
+                      value={categoryFilter}
+                      onValueChange={setCategoryFilter}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        {LEAD_STATUS_HIERARCHY.map((category) => (
+                          <SelectItem
+                            key={category.value}
+                            value={category.value}
+                          >
+                            {category.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Status</label>
                     <Select
@@ -361,13 +374,21 @@ export default function LeadsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="NEW">New</SelectItem>
-                        <SelectItem value="CONTACTED">Contacted</SelectItem>
-                        <SelectItem value="INTERESTED">Interested</SelectItem>
-                        <SelectItem value="FOLLOW_UP">Follow Up</SelectItem>
-                        <SelectItem value="QUALIFIED">Qualified</SelectItem>
-                        <SelectItem value="CONVERTED">Converted</SelectItem>
-                        <SelectItem value="LOST">Lost</SelectItem>
+                        {LEAD_STATUS_HIERARCHY.map((category) => (
+                          <div key={category.value}>
+                            <div className="text-muted-foreground px-2 py-1.5 text-sm font-semibold">
+                              {category.label}
+                            </div>
+                            {category.statuses.map((status) => (
+                              <SelectItem
+                                key={status.value}
+                                value={status.value}
+                              >
+                                {status.label}
+                              </SelectItem>
+                            ))}
+                          </div>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -463,9 +484,10 @@ export default function LeadsPage() {
                           </Link>
                           <div className="mt-1 flex flex-wrap items-center gap-2">
                             <Badge
-                              className={`text-xs ${statusStyles[lead.status] || ""}`}
+                              className={`text-xs ${statusStyles[lead.status as LeadStatus] || ""}`}
                             >
-                              {lead.status.replace(/_/g, " ")}
+                              {statusDisplayNames[lead.status as LeadStatus] ||
+                                lead.status}
                             </Badge>
                             <Badge
                               className={`text-xs ${priorityStyles[lead.priority] || ""}`}
@@ -739,9 +761,10 @@ export default function LeadsPage() {
                         </TableCell>
                         <TableCell>
                           <Badge
-                            className={`text-xs font-normal whitespace-nowrap ${statusStyles[lead.status] || ""}`}
+                            className={`text-xs font-normal whitespace-nowrap ${statusStyles[lead.status as LeadStatus] || ""}`}
                           >
-                            {lead.status.replace(/_/g, " ")}
+                            {statusDisplayNames[lead.status as LeadStatus] ||
+                              lead.status}
                           </Badge>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">

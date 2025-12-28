@@ -86,6 +86,14 @@ export const campaignRouter = createTRPCRouter({
                   phone: true,
                   email: true,
                   status: true,
+                  category: true,
+                  priority: true,
+                  city: true,
+                  state: true,
+                  courseInterested: true,
+                  source: true,
+                  createdAt: true,
+                  revenue: true,
                 },
               },
             },
@@ -181,7 +189,6 @@ export const campaignRouter = createTRPCRouter({
       return updatedCampaign;
     }),
 
-  // Add leads to campaign
   addLeads: protectedWorkspaceProcedure
     .input(
       z.object({

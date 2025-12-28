@@ -7,6 +7,7 @@ import * as z from "zod";
 import { api } from "@/trpc/react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { LEAD_STATUS_HIERARCHY, statusDisplayNames } from "@/lib/lead-status";
 import {
   Dialog,
   DialogContent,
@@ -44,7 +45,7 @@ const baseSchema = z.object({
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
   source: z.string().default("WEBSITE"),
-  status: z.string().default("NEW"),
+  status: z.string().default("NEW_LEAD"),
   priority: z.string().default("MEDIUM"),
   nextFollowUp: z.string().optional(),
   ownerId: z.string().optional(),
@@ -109,7 +110,7 @@ export function LeadFormDialog() {
       email: "",
       phone: "",
       source: "WEBSITE",
-      status: "NEW",
+      status: "NEW_LEAD",
       priority: "MEDIUM",
       nextFollowUp: "",
       ownerId: "",
@@ -316,21 +317,21 @@ export function LeadFormDialog() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="NEW">New</SelectItem>
-                          <SelectItem value="CONTACTED">Contacted</SelectItem>
-                          <SelectItem value="INTERESTED">Interested</SelectItem>
-                          <SelectItem value="NOT_INTERESTED">
-                            Not Interested
-                          </SelectItem>
-                          <SelectItem value="FOLLOW_UP">Follow Up</SelectItem>
-                          <SelectItem value="QUALIFIED">Qualified</SelectItem>
-                          <SelectItem value="NEGOTIATION">
-                            Negotiation
-                          </SelectItem>
-                          <SelectItem value="CONVERTED">Converted</SelectItem>
-                          <SelectItem value="LOST">Lost</SelectItem>
-                          <SelectItem value="WON">Won</SelectItem>
-                          <SelectItem value="DONE">Done</SelectItem>
+                          {LEAD_STATUS_HIERARCHY.map((category) => (
+                            <div key={category.value}>
+                              <div className="text-muted-foreground px-2 py-1.5 text-sm font-semibold">
+                                {category.label}
+                              </div>
+                              {category.statuses.map((status) => (
+                                <SelectItem
+                                  key={status.value}
+                                  value={status.value}
+                                >
+                                  {status.label}
+                                </SelectItem>
+                              ))}
+                            </div>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />

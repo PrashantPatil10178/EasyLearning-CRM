@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
       mobile,
       phone_number,
       source = "WEBHOOK",
-      status = "NEW",
+      status = "NEW_LEAD",
       priority = "MEDIUM",
       city,
       state,
@@ -374,6 +374,7 @@ export async function POST(request: NextRequest) {
         email: email || null,
         phone: leadPhone,
         source: mappedSource as any,
+        category: "FRESH" as any, // New leads always start in FRESH category
         status: status as any,
         priority: priority as any,
         city,

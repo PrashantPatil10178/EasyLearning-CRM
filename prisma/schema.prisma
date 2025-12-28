@@ -257,9 +257,10 @@ model Lead {
   altPhone    String?
   
   // Lead Details
-  source      LeadSource  @default(WEBSITE)
-  status      LeadStatus  @default(NEW)
-  priority    Priority    @default(MEDIUM)
+  source      LeadSource      @default(WEBSITE)
+  category    LeadCategory    @default(FRESH)
+  status      LeadStatus      @default(NEW_LEAD)
+  priority    Priority        @default(MEDIUM)
   
   // Course Interest (for EasyLearning)
   courseInterested String?
@@ -348,14 +349,27 @@ enum LeadSource {
   OTHER
 }
 
+enum LeadCategory {
+  FRESH
+  ACTIVE
+  CLOSED
+}
+
 enum LeadStatus {
-  NEW
-  CONTACTED
+  // Fresh Category
+  NEW_LEAD
+  
+  // Active Category
   INTERESTED
-  NOT_INTERESTED
+  JUST_CURIOUS
   FOLLOW_UP
+  CONTACTED
   QUALIFIED
   NEGOTIATION
+  
+  // Closed Category
+  NO_RESPONSE
+  NOT_INTERESTED
   CONVERTED
   LOST
   DO_NOT_CONTACT

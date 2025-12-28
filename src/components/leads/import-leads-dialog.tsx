@@ -187,7 +187,7 @@ export function ImportLeadsDialog() {
 
         // Set default values for missing fields
         const defaults: Record<string, any> = {};
-        if (missing.includes("status")) defaults.status = "NEW";
+        if (missing.includes("status")) defaults.status = "NEW_LEAD";
         if (missing.includes("priority")) defaults.priority = "MEDIUM";
         if (missing.includes("source")) defaults.source = "WEBSITE";
         setDefaultValues(defaults);
@@ -425,7 +425,7 @@ export function ImportLeadsDialog() {
                   <div className="space-y-2">
                     <Label>Default Status</Label>
                     <Select
-                      value={defaultValues.status || "NEW"}
+                      value={defaultValues.status || "NEW_LEAD"}
                       onValueChange={(value) =>
                         setDefaultValues({ ...defaultValues, status: value })
                       }

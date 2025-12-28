@@ -74,6 +74,25 @@ export default function AppSidebar() {
 
   const { data: workspaces, isLoading } = api.workspace.getAll.useQuery();
 
+  // Check if AISensy integration is active
+  const { data: aisensyIntegration } = api.integration.get.useQuery(
+    { provider: "AISENSY" },
+    { enabled: !!session?.user },
+  );
+
+  // Check if AISensy is enabled AND has API key configured
+  const isAISensyActive = React.useMemo(() => {
+    if (!aisensyIntegration?.isEnabled) return false;
+
+    try {
+      const config = JSON.parse(aisensyIntegration.config || "{}");
+      // Check if apiKey exists and is not empty (even if masked)
+      return !!config.apiKey && config.apiKey.length > 0;
+    } catch (e) {
+      return false;
+    }
+  }, [aisensyIntegration]);
+
   const handleSwitchTenant = (tenantId: string) => {
     document.cookie = `workspace-id=${tenantId}; path=/; max-age=31536000`; // 1 year
     window.location.reload();
@@ -87,11 +106,22 @@ export default function AppSidebar() {
 
   // Get navigation items based on user role
   const userRole = session?.user?.role || "AGENT";
-  const navItems = React.useMemo(
+  const baseNavItems = React.useMemo(
     () =>
       getNavItemsByRole(userRole as "ADMIN" | "MANAGER" | "AGENT" | "VIEWER"),
     [userRole],
   );
+
+  // Filter navigation items - hide WhatsApp Triggers if AISensy not active
+  const navItems = React.useMemo(() => {
+    return baseNavItems.filter((item) => {
+      // Hide WhatsApp Triggers if AISensy integration is not active
+      if (item.url === "/dashboard/whatsapp-triggers" && !isAISensyActive) {
+        return false;
+      }
+      return true;
+    });
+  }, [baseNavItems, isAISensyActive]);
 
   React.useEffect(() => {
     // Side effects based on sidebar state changes

@@ -54,6 +54,7 @@ import {
   Activity,
   FileText,
   MoreHorizontal,
+  Plus,
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -68,6 +69,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  LEAD_STATUS_HIERARCHY,
+  statusStyles,
+  statusDisplayNames,
+} from "@/lib/lead-status";
 
 export default function LeadDetailPage() {
   const params = useParams();
@@ -82,6 +96,8 @@ export default function LeadDetailPage() {
   const [selectedStatus, setSelectedStatus] = useState("");
   const [isCallingCallerDesk, setIsCallingCallerDesk] = useState(false);
   const [showCallCompletionModal, setShowCallCompletionModal] = useState(false);
+  const [showAddCampaignDialog, setShowAddCampaignDialog] = useState(false);
+  const [selectedCampaignId, setSelectedCampaignId] = useState("");
 
   const {
     data: lead,
@@ -93,6 +109,23 @@ export default function LeadDetailPage() {
       leadId,
     }) as { data: Array<any>; refetch: () => void };
   const { data: tasks = [] } = api.task.getByLeadId.useQuery({ leadId });
+  const { data: campaignsData } = api.campaign.getAll.useQuery({
+    page: 1,
+    limit: 100,
+  });
+  const campaigns = campaignsData?.campaigns || [];
+
+  const addLeadsToCampaignMutation = api.campaign.addLeads.useMutation({
+    onSuccess: () => {
+      toast.success("Lead added to campaign successfully");
+      refetch();
+      setShowAddCampaignDialog(false);
+      setSelectedCampaignId("");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to add lead to campaign");
+    },
+  });
 
   const updateStatusMutation = api.lead.updateStatus.useMutation({
     onSuccess: () => {
@@ -199,21 +232,26 @@ export default function LeadDetailPage() {
     });
   };
 
+  const handleAddToCampaign = () => {
+    if (!selectedCampaignId) {
+      toast.error("Please select a campaign");
+      return;
+    }
+    addLeadsToCampaignMutation.mutate({
+      campaignId: selectedCampaignId,
+      leadIds: [leadId],
+    });
+  };
+
   const getInitials = (first: string, last?: string) => {
     return `${first.charAt(0)}${last ? last.charAt(0) : ""}`.toUpperCase();
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "NEW":
-        return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800";
-      case "WON":
-        return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800";
-      case "LOST":
-        return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800";
-      default:
-        return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700";
-    }
+    return (
+      statusStyles[status as keyof typeof statusStyles] ||
+      "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+    );
   };
 
   const getStatusIcon = (status: string) => {
@@ -353,7 +391,9 @@ export default function LeadDetailPage() {
                       variant="secondary"
                       className={`${getStatusColor(lead.status)} border`}
                     >
-                      {lead.status}
+                      {statusDisplayNames[
+                        lead.status as keyof typeof statusDisplayNames
+                      ] || lead.status}
                     </Badge>
                     <span className="hidden md:inline">•</span>
                     <div className="flex items-center gap-1">
@@ -743,13 +783,25 @@ export default function LeadDetailPage() {
               <TabsContent value="campaigns" className="mt-6 space-y-4">
                 <Card className="shadow-md">
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Megaphone className="h-5 w-5" />
-                      Active Campaigns
-                    </CardTitle>
-                    <CardDescription>
-                      Campaigns this lead is currently part of.
-                    </CardDescription>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <Megaphone className="h-5 w-5" />
+                          Active Campaigns
+                        </CardTitle>
+                        <CardDescription>
+                          Campaigns this lead is currently part of.
+                        </CardDescription>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => setShowAddCampaignDialog(true)}
+                        className="gap-2"
+                      >
+                        <Megaphone className="h-4 w-4" />
+                        Add to Campaign
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     {lead.campaignLeads && lead.campaignLeads.length > 0 ? (
@@ -806,11 +858,22 @@ export default function LeadDetailPage() {
                           Add this lead to a campaign to start automated
                           outreach.
                         </p>
-                        <Button variant="link" className="mt-2" asChild>
-                          <Link href="/dashboard/campaigns">
-                            Browse Campaigns
-                          </Link>
-                        </Button>
+                        <div className="mt-4 flex gap-2">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => setShowAddCampaignDialog(true)}
+                            className="gap-2"
+                          >
+                            <Megaphone className="h-4 w-4" />
+                            Add to Campaign
+                          </Button>
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href="/dashboard/campaigns">
+                              Browse Campaigns
+                            </Link>
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </CardContent>
@@ -841,13 +904,18 @@ export default function LeadDetailPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="NEW">New</SelectItem>
-                    <SelectItem value="CONTACTED">Contacted</SelectItem>
-                    <SelectItem value="FOLLOW_UP">Follow Up</SelectItem>
-                    <SelectItem value="INTERESTED">Interested</SelectItem>
-                    <SelectItem value="WON">Won</SelectItem>
-                    <SelectItem value="LOST">Lost</SelectItem>
-                    <SelectItem value="DONE">Done</SelectItem>
+                    {LEAD_STATUS_HIERARCHY.map((category) => (
+                      <div key={category.value}>
+                        <div className="text-muted-foreground px-2 py-1.5 text-sm font-semibold">
+                          {category.label}
+                        </div>
+                        {category.statuses.map((status) => (
+                          <SelectItem key={status.value} value={status.value}>
+                            {status.label}
+                          </SelectItem>
+                        ))}
+                      </div>
+                    ))}
                   </SelectContent>
                 </Select>
 
@@ -1067,6 +1135,85 @@ export default function LeadDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Add to Campaign Dialog */}
+      <Dialog
+        open={showAddCampaignDialog}
+        onOpenChange={setShowAddCampaignDialog}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Lead to Campaign</DialogTitle>
+            <DialogDescription>
+              Select a campaign to add {lead?.firstName} {lead?.lastName} to
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="campaign">Campaign</Label>
+              <Select
+                value={selectedCampaignId}
+                onValueChange={setSelectedCampaignId}
+              >
+                <SelectTrigger id="campaign">
+                  <SelectValue placeholder="Select a campaign" />
+                </SelectTrigger>
+                <SelectContent>
+                  {campaigns.length === 0 ? (
+                    <div className="text-muted-foreground p-4 text-center text-sm">
+                      No campaigns available
+                    </div>
+                  ) : (
+                    campaigns
+                      .filter(
+                        (campaign) =>
+                          !lead?.campaignLeads?.some(
+                            (cl: any) => cl.campaignId === campaign.id,
+                          ),
+                      )
+                      .map((campaign) => (
+                        <SelectItem key={campaign.id} value={campaign.id}>
+                          <div className="flex items-center gap-2">
+                            <span>{campaign.name}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {campaign.type}
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAddCampaignDialog(false);
+                setSelectedCampaignId("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddToCampaign}
+              disabled={
+                !selectedCampaignId || addLeadsToCampaignMutation.isPending
+              }
+            >
+              {addLeadsToCampaignMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                "Add to Campaign"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Call Completion Modal */}
       {lead && (

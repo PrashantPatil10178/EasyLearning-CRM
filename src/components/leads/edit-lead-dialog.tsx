@@ -7,6 +7,7 @@ import * as z from "zod";
 import { api } from "@/trpc/react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { LEAD_STATUS_HIERARCHY } from "@/lib/lead-status";
 import {
   Dialog,
   DialogContent,
@@ -124,7 +125,7 @@ export function EditLeadDialog({
       email: lead.email || "",
       phone: lead.phone || "",
       source: lead.source || "WEBSITE",
-      status: lead.status || "NEW",
+      status: lead.status || "NEW_LEAD",
       priority: lead.priority || "MEDIUM",
       nextFollowUp: lead.nextFollowUp
         ? new Date(lead.nextFollowUp).toISOString().slice(0, 16)
@@ -326,21 +327,21 @@ export function EditLeadDialog({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="NEW">New</SelectItem>
-                          <SelectItem value="CONTACTED">Contacted</SelectItem>
-                          <SelectItem value="INTERESTED">Interested</SelectItem>
-                          <SelectItem value="NOT_INTERESTED">
-                            Not Interested
-                          </SelectItem>
-                          <SelectItem value="FOLLOW_UP">Follow Up</SelectItem>
-                          <SelectItem value="QUALIFIED">Qualified</SelectItem>
-                          <SelectItem value="NEGOTIATION">
-                            Negotiation
-                          </SelectItem>
-                          <SelectItem value="CONVERTED">Converted</SelectItem>
-                          <SelectItem value="LOST">Lost</SelectItem>
-                          <SelectItem value="WON">Won</SelectItem>
-                          <SelectItem value="DONE">Done</SelectItem>
+                          {LEAD_STATUS_HIERARCHY.map((category) => (
+                            <div key={category.value}>
+                              <div className="text-muted-foreground px-2 py-1.5 text-sm font-semibold">
+                                {category.label}
+                              </div>
+                              {category.statuses.map((status) => (
+                                <SelectItem
+                                  key={status.value}
+                                  value={status.value}
+                                >
+                                  {status.label}
+                                </SelectItem>
+                              ))}
+                            </div>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />

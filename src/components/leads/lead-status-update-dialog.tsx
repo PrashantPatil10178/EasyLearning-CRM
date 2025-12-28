@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { LEAD_STATUS_HIERARCHY, ALL_LEAD_STATUSES } from "@/lib/lead-status";
 import {
   Dialog,
   DialogContent,
@@ -36,18 +37,21 @@ import { Loader2 } from "lucide-react";
 
 const statusUpdateSchema = z.object({
   status: z.enum([
-    "NEW",
-    "CONTACTED",
+    "NEW_LEAD",
     "INTERESTED",
-    "NOT_INTERESTED",
+    "JUST_CURIOUS",
     "FOLLOW_UP",
+    "CONTACTED",
     "QUALIFIED",
     "NEGOTIATION",
+    "NO_RESPONSE",
+    "NOT_INTERESTED",
     "CONVERTED",
     "LOST",
+    "DO_NOT_CONTACT",
     "WON",
     "DONE",
-  ]),
+  ] as const),
   notes: z.string().optional(),
 });
 
@@ -102,17 +106,8 @@ export function LeadStatusUpdateDialog({
       status: data.status,
     });
 
-    // If notes provided, create a note
-    if (data.notes?.trim()) {
-      try {
-        await utils.client.note.create.mutate({
-          leadId: lead.id,
-          content: `Call Follow-up: ${data.notes}`,
-        });
-      } catch (error) {
-        console.error("Failed to create note:", error);
-      }
-    }
+    // Note: If notes needed, they can be added through activity log
+    // The status change already creates an activity entry
   };
 
   if (!lead) return null;
@@ -146,17 +141,18 @@ export function LeadStatusUpdateDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="CONTACTED">Contacted</SelectItem>
-                      <SelectItem value="INTERESTED">Interested</SelectItem>
-                      <SelectItem value="NOT_INTERESTED">
-                        Not Interested
-                      </SelectItem>
-                      <SelectItem value="FOLLOW_UP">Follow Up</SelectItem>
-                      <SelectItem value="QUALIFIED">Qualified</SelectItem>
-                      <SelectItem value="NEGOTIATION">Negotiation</SelectItem>
-                      <SelectItem value="CONVERTED">Converted</SelectItem>
-                      <SelectItem value="LOST">Lost</SelectItem>
-                      <SelectItem value="WON">Won</SelectItem>
+                      {LEAD_STATUS_HIERARCHY.map((category) => (
+                        <div key={category.value}>
+                          <div className="text-muted-foreground px-2 py-1.5 text-sm font-semibold">
+                            {category.label}
+                          </div>
+                          {category.statuses.map((status) => (
+                            <SelectItem key={status.value} value={status.value}>
+                              {status.label}
+                            </SelectItem>
+                          ))}
+                        </div>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormDescription>

@@ -18,7 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { api } from "@/trpc/react";
 import { useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, MessageCircle, Zap } from "lucide-react";
 
 const formSchema = z.object({
   apiKey: z.string().min(1, "API Key is required"),
@@ -88,6 +88,36 @@ export function AiSensyForm() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {/* WhatsApp Triggers Info Banner */}
+        {form.watch("isEnabled") && (
+          <div className="rounded-lg border-2 border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 p-4 dark:border-green-800 dark:from-green-950/50 dark:to-emerald-950/50">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
+                <Zap className="h-5 w-5 text-green-600 dark:text-green-300" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-semibold text-green-900 dark:text-green-100">
+                  🎉 WhatsApp Triggers Unlocked!
+                </h3>
+                <p className="text-sm text-green-800 dark:text-green-200">
+                  With AISensy active, you can now automate WhatsApp messages
+                  when lead status changes. Go to{" "}
+                  <strong>WhatsApp Triggers</strong> to set up automatic
+                  messages for status changes like CONVERTED, FOLLOW_UP_DONE,
+                  etc.
+                </p>
+                <a
+                  href="/dashboard/whatsapp-triggers"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-green-700 hover:text-green-800 dark:text-green-300 dark:hover:text-green-200"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  Configure WhatsApp Triggers →
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
         <FormField
           control={form.control}
           name="isEnabled"
