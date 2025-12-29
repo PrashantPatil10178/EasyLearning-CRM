@@ -9,7 +9,7 @@ cmds = [
 [phases.build]
 cmds = [
   "pnpm prisma generate",
-  "pnpm prisma migrate deploy",
+  "pnpm prisma db push --accept-data-loss --skip-generate",
   "pnpm run build",
   "pnpm run make-admin"
 ]
