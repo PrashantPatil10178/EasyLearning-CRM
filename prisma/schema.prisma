@@ -1,12 +1,11 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = env("DATABASE_PROVIDER") // "sqlite" for local, "postgresql" for production
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -954,15 +953,12 @@ model WebhookAssignmentRule {
   status      String?  // NEW, CONTACTED, etc.
   priority    Int      @default(0) // Rule execution priority (lower = higher priority)
   
-  // Assignment strategy
   assignmentType String @default("SPECIFIC") // SPECIFIC, ROUND_ROBIN, PERCENTAGE
   percentage     Int?   // For percentage-based assignment (0-100)
   
-  // Assignment
   assigneeId  String
   assignee    User     @relation(fields: [assigneeId], references: [id], onDelete: Cascade)
   
-  // Round robin tracking
   lastAssignedAt DateTime?
   assignmentCount Int @default(0)
   
