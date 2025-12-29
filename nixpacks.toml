@@ -9,12 +9,10 @@ cmds = [
 [phases.build]
 cmds = [
   "pnpm prisma generate",
-  "pnpm run build"
+  "pnpm run build",
+  "pnpm run make-admin"
 ]
 
 [start]
 cmd = "pnpm run start"
 
-[variables]
-NODE_ENV = "production"
-PORT = "3000"
