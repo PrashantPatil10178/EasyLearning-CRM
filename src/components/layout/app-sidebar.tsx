@@ -80,6 +80,12 @@ export default function AppSidebar() {
     { enabled: !!session?.user },
   );
 
+  // Check if CallerDesk integration is active
+  const { data: callerdeskIntegration } = api.integration.get.useQuery(
+    { provider: "CALLERDESK" },
+    { enabled: !!session?.user },
+  );
+
   // Check if AISensy is enabled AND has API key configured
   const isAISensyActive = React.useMemo(() => {
     if (!aisensyIntegration?.isEnabled) return false;
@@ -92,6 +98,19 @@ export default function AppSidebar() {
       return false;
     }
   }, [aisensyIntegration]);
+
+  // Check if CallerDesk is enabled AND has API key configured
+  const isCallerDeskActive = React.useMemo(() => {
+    if (!callerdeskIntegration?.isEnabled) return false;
+
+    try {
+      const config = JSON.parse(callerdeskIntegration.config || "{}");
+      // Check if apiKey exists and is not empty (even if masked)
+      return !!config.apiKey && config.apiKey.length > 0;
+    } catch (e) {
+      return false;
+    }
+  }, [callerdeskIntegration]);
 
   const handleSwitchTenant = (tenantId: string) => {
     document.cookie = `workspace-id=${tenantId}; path=/; max-age=31536000`; // 1 year
@@ -119,9 +138,13 @@ export default function AppSidebar() {
       if (item.url === "/dashboard/whatsapp-triggers" && !isAISensyActive) {
         return false;
       }
+      // Hide CallerDesk Logs if CallerDesk integration is not active
+      if (item.url === "/dashboard/call-logs" && !isCallerDeskActive) {
+        return false;
+      }
       return true;
     });
-  }, [baseNavItems, isAISensyActive]);
+  }, [baseNavItems, isAISensyActive, isCallerDeskActive]);
 
   React.useEffect(() => {
     // Side effects based on sidebar state changes
@@ -274,12 +297,14 @@ export default function AppSidebar() {
                     <IconListDetails className="mr-2 h-4 w-4" />
                     My Tasks
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => router.push("/dashboard/call-logs")}
-                  >
-                    <IconPhone className="mr-2 h-4 w-4" />
-                    Call Logs
-                  </DropdownMenuItem>
+                  {isCallerDeskActive && (
+                    <DropdownMenuItem
+                      onClick={() => router.push("/dashboard/call-logs")}
+                    >
+                      <IconPhone className="mr-2 h-4 w-4" />
+                      CallerDesk Logs
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuGroup>
 
                 {(session?.user?.role === "ADMIN" ||

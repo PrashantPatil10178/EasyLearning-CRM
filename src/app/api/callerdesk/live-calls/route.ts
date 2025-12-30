@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { auth } from "@/server/auth";
+import { db } from "@/server/db";
+import { decrypt, isEncrypted } from "@/lib/encryption";
+import { cookies } from "next/headers";
 
-const CALLERDESK_API_KEY = process.env.CALLERDESK_API_KEY;
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Check authentication
     const session = await auth();
@@ -11,17 +13,69 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!CALLERDESK_API_KEY) {
-      console.error("CallerDesk API key not configured");
+    // Get workspace ID from cookie
+    const cookieStore = await cookies();
+    const workspaceId = cookieStore.get("workspace-id")?.value;
+
+    if (!workspaceId) {
       return NextResponse.json(
-        { error: "CallerDesk API key not configured" },
+        { error: "Workspace not selected" },
+        { status: 400 },
+      );
+    }
+
+    // Fetch CallerDesk integration from database
+    const integration = await db.integration.findUnique({
+      where: {
+        workspaceId_provider: {
+          workspaceId: workspaceId,
+          provider: "CALLERDESK",
+        },
+      },
+    });
+
+    if (!integration) {
+      return NextResponse.json(
+        { error: "CallerDesk integration not configured for this workspace" },
+        { status: 400 },
+      );
+    }
+
+    if (!integration.isEnabled) {
+      return NextResponse.json(
+        { error: "CallerDesk integration is disabled for this workspace" },
+        { status: 400 },
+      );
+    }
+
+    // Parse and decrypt API key
+    let authCode: string | undefined;
+    try {
+      const config = JSON.parse(integration.config);
+      authCode = config.apiKey;
+
+      if (!authCode) {
+        return NextResponse.json(
+          { error: "CallerDesk API key not configured" },
+          { status: 500 },
+        );
+      }
+
+      // Decrypt if encrypted
+      if (isEncrypted(authCode)) {
+        authCode = decrypt(authCode);
+      }
+    } catch (e) {
+      console.error("Failed to parse integration config:", e);
+      return NextResponse.json(
+        { error: "Invalid integration configuration" },
         { status: 500 },
       );
     }
 
     // Fetch live calls from CallerDesk
     const response = await fetch(
-      `https://app.callerdesk.io/api/live_call_v2?authcode=${CALLERDESK_API_KEY}`,
+      `https://app.callerdesk.io/api/live_call_v2?authcode=${authCode}`,
       {
         method: "GET",
         headers: {

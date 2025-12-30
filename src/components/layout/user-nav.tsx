@@ -22,10 +22,31 @@ import {
   HelpCircle,
   LogOut,
 } from "lucide-react";
+import { api } from "@/trpc/react";
+import * as React from "react";
 
 export function UserNav() {
   const { data: session } = useSession();
   const router = useRouter();
+
+  // Check if CallerDesk integration is active
+  const { data: callerdeskIntegration } = api.integration.get.useQuery(
+    { provider: "CALLERDESK" },
+    { enabled: !!session?.user },
+  );
+
+  // Check if CallerDesk is enabled AND has API key configured
+  const isCallerDeskActive = React.useMemo(() => {
+    if (!callerdeskIntegration?.isEnabled) return false;
+
+    try {
+      const config = JSON.parse(callerdeskIntegration.config || "{}");
+      // Check if apiKey exists and is not empty (even if masked)
+      return !!config.apiKey && config.apiKey.length > 0;
+    } catch (e) {
+      return false;
+    }
+  }, [callerdeskIntegration]);
 
   if (session) {
     const userRole = session.user.role;
@@ -85,12 +106,14 @@ export function UserNav() {
               <ListTodo className="mr-2 h-4 w-4" />
               My Tasks
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => router.push("/dashboard/call-logs")}
-            >
-              <Phone className="mr-2 h-4 w-4" />
-              Call Logs
-            </DropdownMenuItem>
+            {isCallerDeskActive && (
+              <DropdownMenuItem
+                onClick={() => router.push("/dashboard/call-logs")}
+              >
+                <Phone className="mr-2 h-4 w-4" />
+                CallerDesk Logs
+              </DropdownMenuItem>
+            )}
           </DropdownMenuGroup>
           {isAdminOrManager && (
             <>

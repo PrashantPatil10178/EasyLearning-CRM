@@ -288,6 +288,7 @@ export async function POST(request: NextRequest) {
     // Auto-assign lead based on rules with advanced strategies
     let assignedUserId: string | undefined;
     let assignmentStrategy = "NONE";
+    let assignedCampaignIds: string[] = []; // Track campaigns to add lead to
 
     // Fetch matching rules (source match or wildcard)
     const matchingRules = await db.webhookAssignmentRule.findMany({
@@ -296,10 +297,24 @@ export async function POST(request: NextRequest) {
         isEnabled: true,
         OR: [{ source: mappedSource }, { source: source }, { source: null }],
       },
+      include: {
+        campaign: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
       orderBy: { priority: "asc" },
     });
 
     if (matchingRules.length > 0) {
+      // Collect all campaigns from rules
+      assignedCampaignIds = matchingRules
+        .filter((r) => r.campaignId)
+        .map((r) => r.campaignId!)
+        .filter((id, index, self) => self.indexOf(id) === index); // Remove duplicates
+
       // Separate rules by type
       const specificRules = matchingRules.filter(
         (r) => r.assignmentType === "SPECIFIC",
@@ -364,6 +379,9 @@ export async function POST(request: NextRequest) {
       console.log(
         `[Lead Webhook] Assigned via ${assignmentStrategy} to: ${assignedUserId || "none"}`,
       );
+      console.log(
+        `[Lead Webhook] Will add to campaigns: ${assignedCampaignIds.join(", ") || "none"}`,
+      );
     }
 
     // Create new lead
@@ -395,13 +413,41 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Add lead to campaigns (if any campaign rules matched)
+    if (assignedCampaignIds.length > 0) {
+      await Promise.all(
+        assignedCampaignIds.map((campaignId) =>
+          db.campaignLead
+            .create({
+              data: {
+                campaignId: campaignId,
+                leadId: newLead.id,
+                category: "FRESH",
+                workspaceId,
+              },
+            })
+            .catch((err) => {
+              // Ignore if already exists
+              console.log(
+                `[Lead Webhook] Lead already in campaign ${campaignId}:`,
+                err.message,
+              );
+            }),
+        ),
+      );
+
+      console.log(
+        `[Lead Webhook] Added lead to ${assignedCampaignIds.length} campaign(s)`,
+      );
+    }
+
     // Log activity
     await db.activity.create({
       data: {
         leadId: newLead.id,
         type: "SYSTEM",
         subject: "Lead Created via Webhook",
-        message: `New lead received from ${mappedSource} (original: ${source})${notes ? `: ${notes}` : ""}${assignedUserId ? ` (Auto-assigned via ${assignmentStrategy})` : ""}`,
+        message: `New lead received from ${mappedSource} (original: ${source})${notes ? `: ${notes}` : ""}${assignedUserId ? ` (Auto-assigned via ${assignmentStrategy})` : ""}${assignedCampaignIds.length > 0 ? ` (Added to ${assignedCampaignIds.length} campaign(s))` : ""}`,
         workspaceId,
       },
     });

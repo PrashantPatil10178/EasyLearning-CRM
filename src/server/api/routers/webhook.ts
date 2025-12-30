@@ -63,6 +63,19 @@ export const webhookRouter = createTRPCRouter({
       };
     }),
 
+  // Get user-defined lead fields for workspace
+  getLeadFields: protectedWorkspaceProcedure.query(async ({ ctx }) => {
+    const fields = await ctx.db.leadField.findMany({
+      where: {
+        workspaceId: ctx.workspaceId,
+        isVisible: true,
+      },
+      orderBy: { order: "asc" },
+    });
+
+    return fields;
+  }),
+
   // Get webhook assignment rules
   getAssignmentRules: protectedWorkspaceProcedure.query(async ({ ctx }) => {
     const rules = await ctx.db.webhookAssignmentRule.findMany({
@@ -76,6 +89,13 @@ export const webhookRouter = createTRPCRouter({
             name: true,
             email: true,
             image: true,
+          },
+        },
+        campaign: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
           },
         },
       },
@@ -92,6 +112,7 @@ export const webhookRouter = createTRPCRouter({
         id: z.string().optional(),
         source: z.string().optional(), // Can be enum (WEBSITE, FACEBOOK) or custom string
         status: z.string().optional(), // NEW, CONTACTED, etc.
+        campaignId: z.string().optional(), // Target campaign to assign leads to
         assignmentType: z
           .enum(["SPECIFIC", "ROUND_ROBIN", "PERCENTAGE"])
           .default("SPECIFIC"),

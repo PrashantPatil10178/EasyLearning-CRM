@@ -1,0 +1,1138 @@
+"use client";
+
+import { useState } from "react";
+import * as React from "react";
+import PageContainer from "@/components/layout/page-container";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { api } from "@/trpc/react";
+import { toast } from "sonner";
+import {
+  Copy,
+  Webhook,
+  Shield,
+  Activity,
+  FileCode,
+  ExternalLink,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Image from "next/image";
+
+export default function WebhooksPage() {
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [logsPage, setLogsPage] = useState(1);
+  const [selectedFields, setSelectedFields] = useState<string[]>([
+    "firstName",
+    "phone",
+  ]);
+  const [n8nOpen, setN8nOpen] = useState(false);
+  const [pabblyOpen, setPabblyOpen] = useState(false);
+  const logsPerPage = 10;
+
+  // Get current workspace
+  const { data: currentWorkspace } = api.workspace.getCurrent.useQuery() as {
+    data:
+      | {
+          name: string;
+          id: string;
+          createdAt: Date;
+          updatedAt: Date;
+          slug: string;
+          logo: string | null;
+          settings: string | null;
+          webhookToken?: string | null;
+        }
+      | undefined;
+  };
+
+  // Set webhook URL on client side
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      setWebhookUrl(`${window.location.origin}/api/webhooks/lead`);
+    }
+  }, []);
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+
+    toast.success("Copied to clipboard!");
+  };
+
+  const utils = api.useUtils();
+  const { data: webhookLogsData } = api.webhook.getRecentLogs.useQuery({
+    limit: logsPerPage,
+    offset: (logsPage - 1) * logsPerPage,
+  });
+  const webhookLogs = webhookLogsData?.logs || [];
+  const totalLogs = webhookLogsData?.total || 0;
+  const totalPages = Math.ceil(totalLogs / logsPerPage);
+
+  const { data: leadFields } = api.webhook.getLeadFields.useQuery();
+
+  const generateWebhookToken = api.workspace.generateWebhookToken.useMutation({
+    onSuccess: () => {
+      toast.success("Webhook token generated successfully");
+      utils.workspace.getCurrent.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const regenerateWebhookToken =
+    api.workspace.regenerateWebhookToken.useMutation({
+      onSuccess: () => {
+        toast.success("Webhook token regenerated. Update your webhooks!");
+        utils.workspace.getCurrent.invalidate();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    });
+
+  const toggleField = (field: string) => {
+    if (field === "firstName" || field === "phone") {
+      toast.error("This field is required and cannot be deselected");
+      return;
+    }
+    setSelectedFields((prev) =>
+      prev.includes(field)
+        ? prev.filter((f) => f !== field)
+        : [...prev, field],
+    );
+  };
+
+  // Standard fields
+  const standardFields = [
+    { key: "firstName", label: "First Name", required: true },
+    { key: "lastName", label: "Last Name", required: false },
+    { key: "email", label: "Email", required: false },
+    { key: "phone", label: "Phone", required: true },
+    { key: "source", label: "Source", required: false },
+    { key: "status", label: "Status", required: false },
+    { key: "priority", label: "Priority", required: false },
+    { key: "city", label: "City", required: false },
+    { key: "state", label: "State", required: false },
+    { key: "country", label: "Country", required: false },
+    { key: "courseInterested", label: "Course Interested", required: false },
+    { key: "tags", label: "Tags", required: false },
+    { key: "campaign", label: "Campaign", required: false },
+  ];
+
+  // Generate sample JSON based on selected fields
+  const generateSampleJSON = () => {
+    const sample: any = {};
+    
+    selectedFields.forEach((field) => {
+      const standardField = standardFields.find((f) => f.key === field);
+      if (standardField) {
+        switch (field) {
+          case "firstName":
+            sample.firstName = "John";
+            break;
+          case "lastName":
+            sample.lastName = "Doe";
+            break;
+          case "email":
+            sample.email = "john@example.com";
+            break;
+          case "phone":
+            sample.phone = "1234567890";
+            break;
+          case "source":
+            sample.source = "Website";
+            break;
+          case "status":
+            sample.status = "NEW";
+            break;
+          case "priority":
+            sample.priority = "MEDIUM";
+            break;
+          case "city":
+            sample.city = "Mumbai";
+            break;
+          case "state":
+            sample.state = "Maharashtra";
+            break;
+          case "country":
+            sample.country = "India";
+            break;
+          case "courseInterested":
+            sample.courseInterested = "Web Development";
+            break;
+          case "tags":
+            sample.tags = "Premium,Urgent";
+            break;
+          case "campaign":
+            sample.campaign = "Summer Campaign 2025";
+            break;
+        }
+      }
+    });
+
+    // Add selected custom fields
+    if (leadFields) {
+      leadFields.forEach((field: any) => {
+        if (selectedFields.includes(field.key)) {
+          if (!sample.customFields) {
+            sample.customFields = {};
+          }
+          sample.customFields[field.key] = field.type === "NUMBER" ? 0 : "value";
+        }
+      });
+    }
+
+    return JSON.stringify(sample, null, 2);
+  };
+
+  // Generate cURL command
+  const generateCurlCommand = () => {
+    return `curl -X POST '${webhookUrl}' \\
+  -H 'Content-Type: application/json' \\
+  -H 'x-workspace-id: ${currentWorkspace?.id || "YOUR_WORKSPACE_ID"}' \\
+  -H 'x-webhook-token: ${currentWorkspace?.webhookToken || "YOUR_WEBHOOK_TOKEN"}' \\
+  -d '${generateSampleJSON().replace(/\n/g, "\\n")}'`;
+  };
+
+  return (
+    <PageContainer>
+      <div className="space-y-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">
+              Webhooks & Auto-Assignment
+            </h2>
+            <p className="text-muted-foreground mt-2">
+              Configure webhook integrations and automatic lead assignment
+              rules.
+            </p>
+          </div>
+        </div>
+
+        <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 dark:border-blue-800 dark:from-blue-950/50 dark:to-indigo-950/50">
+          <CardContent className="">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900">
+                  <Shield className="h-5 w-5 text-blue-600 dark:text-blue-300" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    Current Workspace ID
+                  </p>
+                  <p className="text-xs text-blue-700/70 dark:text-blue-300/70">
+                    Use this ID in the x-workspace-id header for webhook
+                    requests
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <code className="rounded-lg bg-blue-100 px-4 py-2 font-mono text-sm text-blue-900 dark:bg-blue-900 dark:text-blue-100">
+                  {currentWorkspace?.id || "Loading..."}
+                </code>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => copyToClipboard(currentWorkspace?.id || "")}
+                  className="bg-white/50 hover:bg-white dark:bg-black/20 dark:hover:bg-black/40"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Webhook URL Section */}
+        <Card className="overflow-hidden">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700">
+                <Webhook className="h-4 w-4" />
+              </div>
+              <CardTitle className="text-xl">Lead Webhook URL</CardTitle>
+            </div>
+            <CardDescription>
+              Use this webhook URL to receive new leads from Pabbly, Zapier,
+              Make.com, or any other automation platform.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6 pt-6">
+            <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-900">
+              <Label className="text-sm font-medium">Webhook Endpoint</Label>
+              <div className="mt-2 flex gap-2">
+                <Input
+                  value={webhookUrl}
+                  readOnly
+                  className="bg-white font-mono text-sm dark:bg-slate-950"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => copyToClipboard(webhookUrl)}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Webhook Token Section */}
+            <div className="rounded-lg border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-amber-50 p-6 dark:border-yellow-800 dark:from-yellow-950/50 dark:to-amber-950/50">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900">
+                  <Shield className="h-5 w-5 text-yellow-600 dark:text-yellow-300" />
+                </div>
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-yellow-900 dark:text-yellow-100">
+                      🔐 Webhook Authentication Token
+                    </p>
+                    <p className="mt-1 text-sm text-yellow-800 dark:text-yellow-200">
+                      Include this token in the{" "}
+                      <code className="rounded bg-yellow-100 px-1 dark:bg-yellow-900">
+                        x-webhook-token
+                      </code>{" "}
+                      header for all webhook requests. Keep it secret!
+                    </p>
+                  </div>
+                  {currentWorkspace?.webhookToken ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 rounded-lg bg-yellow-100 p-3 dark:bg-yellow-900">
+                        <code className="font-mono text-xs text-yellow-900 dark:text-yellow-100">
+                          {currentWorkspace.webhookToken}
+                        </code>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() =>
+                          copyToClipboard(currentWorkspace.webhookToken!)
+                        }
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={() => generateWebhookToken.mutate()}
+                      disabled={generateWebhookToken.isPending}
+                      className="bg-yellow-600 hover:bg-yellow-700"
+                    >
+                      {generateWebhookToken.isPending && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      Generate Token
+                    </Button>
+                  )}
+                  {currentWorkspace?.webhookToken && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        if (
+                          confirm(
+                            "Regenerating will invalidate the old token. All existing webhooks will need to be updated. Continue?",
+                          )
+                        ) {
+                          regenerateWebhookToken.mutate();
+                        }
+                      }}
+                      disabled={regenerateWebhookToken.isPending}
+                    >
+                      {regenerateWebhookToken.isPending && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      Regenerate
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-900">
+                <h3 className="mb-3 font-medium">Required Headers</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between rounded-md bg-white p-3 dark:bg-slate-800">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">x-workspace-id</Badge>
+                      <span className="text-muted-foreground text-sm">
+                        {currentWorkspace?.id || "Your workspace ID"}
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2"
+                      onClick={() =>
+                        copyToClipboard(currentWorkspace?.id || "")
+                      }
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between rounded-md bg-white p-3 dark:bg-slate-800">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">x-webhook-token</Badge>
+                      <span className="text-muted-foreground text-sm">
+                        {currentWorkspace?.webhookToken
+                          ? "Your webhook token"
+                          : "Generate token first"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between rounded-md bg-white p-3 dark:bg-slate-800">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">Content-Type</Badge>
+                      <span className="text-muted-foreground text-sm">
+                        application/json
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-900">
+                <h3 className="mb-3 font-medium">Required Fields</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between rounded-md bg-white p-3 dark:bg-slate-800">
+                    <div className="flex items-center gap-2">
+                      <Badge>firstName</Badge>
+                      <span className="text-muted-foreground text-sm">
+                        Lead's first name
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between rounded-md bg-white p-3 dark:bg-slate-800">
+                    <div className="flex items-center gap-2">
+                      <Badge>phone</Badge>
+                      <span className="text-muted-foreground text-sm">
+                        Lead's phone number
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-900">
+              <h3 className="mb-3 font-medium">Optional Fields</h3>
+              <p className="text-muted-foreground mb-3 text-xs">
+                These are the custom lead fields defined for your workspace:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {/* Standard optional fields */}
+                {[
+                  "lastName",
+                  "email",
+                  "source",
+                  "status",
+                  "priority",
+                  "city",
+                  "state",
+                  "country",
+                  "courseInterested",
+                  "tags",
+                  "campaign",
+                ].map((field) => (
+                  <Badge key={field} variant="outline" className="text-xs">
+                    {field}
+                  </Badge>
+                ))}
+                {/* User-defined custom fields */}
+                {leadFields && leadFields.length > 0 && (
+                  <>
+                    <Badge
+                      variant="default"
+                      className="bg-blue-500 text-xs text-white"
+                    >
+                      Custom Fields:
+                    </Badge>
+                    {leadFields.map((field: any) => (
+                      <Badge
+                        key={field.key}
+                        variant="secondary"
+                        className="text-xs"
+                      >
+                        {field.key}
+                        {field.isRequired && (
+                          <span className="ml-1 text-red-500">*</span>
+                        )}
+                      </Badge>
+                    ))}
+                  </>
+                )}
+                {(!leadFields || leadFields.length === 0) && (
+                  <p className="text-muted-foreground text-xs italic">
+                    No custom fields defined. Add fields in Lead Fields
+                    settings.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 dark:border-blue-800 dark:from-blue-950/50 dark:to-indigo-950/50">
+              <p className="text-sm text-blue-900 dark:text-blue-100">
+                <strong>💡 Tip:</strong> Test your webhook by sending a POST
+                request with the required headers and fields. The endpoint will
+                create or update leads automatically.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Auto-Assignment Rules */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Settings className="h-5 w-5" />
+                  Auto-Assignment Rules
+                </CardTitle>
+                <CardDescription>
+                  Configure automatic lead assignment with Round Robin,
+                  Percentage, or Direct strategies.
+                </CardDescription>
+              </div>
+              <Button
+                onClick={() => {
+                  setEditingRule(null);
+                  setIsAssignmentDialogOpen(true);
+                }}
+                size="sm"
+              >
+                <Plus className="mr-2 h-4 w-4" /> Add Rule
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            {assignmentRules && assignmentRules.length > 0 ? (
+              (() => {
+                // Group rules by source
+                const groupedRules = assignmentRules.reduce(
+                  (acc: any, rule: any) => {
+                    const sourceKey = rule.source || "All Sources";
+                    if (!acc[sourceKey]) acc[sourceKey] = [];
+                    acc[sourceKey].push(rule);
+                    return acc;
+                  },
+                  {},
+                );
+
+                return (
+                  <div className="space-y-6">
+                    {Object.entries(groupedRules).map(
+                      ([source, rules]: [string, any]) => {
+                        // Calculate percentage totals for this source
+                        const percentageRules = rules.filter(
+                          (r: any) => r.assignmentType === "PERCENTAGE",
+                        );
+                        const totalPercentage = percentageRules.reduce(
+                          (sum: number, r: any) => sum + (r.percentage || 0),
+                          0,
+                        );
+                        const remainingPercentage = 100 - totalPercentage;
+
+                        return (
+                          <div key={source} className="space-y-3">
+                            {/* Source Header with Stats */}
+                            <div className="flex items-center justify-between rounded-lg bg-slate-50 p-4 dark:bg-slate-900">
+                              <div className="flex items-center gap-3">
+                                <Badge
+                                  variant="secondary"
+                                  className="px-3 py-1 text-sm"
+                                >
+                                  {source}
+                                </Badge>
+                                <span className="text-muted-foreground text-sm">
+                                  {rules.length} rule
+                                  {rules.length > 1 ? "s" : ""}
+                                </span>
+                              </div>
+                              {percentageRules.length > 0 && (
+                                <div className="flex items-center gap-2">
+                                  {totalPercentage === 100 ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="border-green-200 bg-green-50 text-green-700"
+                                    >
+                                      ✓ 100% Allocated
+                                    </Badge>
+                                  ) : totalPercentage < 100 ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="border-yellow-200 bg-yellow-50 text-yellow-700"
+                                    >
+                                      ⚠ {remainingPercentage}% Unassigned
+                                    </Badge>
+                                  ) : (
+                                    <Badge
+                                      variant="outline"
+                                      className="border-red-200 bg-red-50 text-red-700"
+                                    >
+                                      ⚠ Over-allocated by{" "}
+                                      {totalPercentage - 100}%
+                                    </Badge>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Rules for this source */}
+                            <div className="ml-4 space-y-3">
+                              {rules.map((rule: any) => (
+                                <div
+                                  key={rule.id}
+                                  className="flex items-center justify-between rounded-lg border bg-white p-4 shadow-sm dark:bg-slate-950"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <Switch
+                                      checked={rule.isEnabled}
+                                      onCheckedChange={(checked) =>
+                                        toggleAssignmentRule.mutate({
+                                          id: rule.id,
+                                          isEnabled: checked,
+                                        })
+                                      }
+                                    />
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium">
+                                          {rule.assignee.name}
+                                        </span>
+                                        {rule.assignmentType ===
+                                          "ROUND_ROBIN" && (
+                                          <Badge
+                                            variant="outline"
+                                            className="border-blue-200 bg-blue-50 text-blue-700"
+                                          >
+                                            🔄 Round Robin
+                                          </Badge>
+                                        )}
+                                        {rule.assignmentType ===
+                                          "PERCENTAGE" && (
+                                          <Badge
+                                            variant="outline"
+                                            className="border-green-200 bg-green-50 text-green-700"
+                                          >
+                                            📊 {rule.percentage}%
+                                          </Badge>
+                                        )}
+                                        {(!rule.assignmentType ||
+                                          rule.assignmentType ===
+                                            "SPECIFIC") && (
+                                          <Badge
+                                            variant="outline"
+                                            className="border-purple-200 bg-purple-50 text-purple-700"
+                                          >
+                                            🎯 Direct
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <p className="text-muted-foreground mt-1 text-sm">
+                                        {rule.assignmentCount > 0 &&
+                                          `${rule.assignmentCount} leads assigned`}
+                                        {rule.campaign && (
+                                          <Badge
+                                            variant="secondary"
+                                            className="ml-2 text-xs"
+                                          >
+                                            → {rule.campaign.name}
+                                          </Badge>
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => {
+                                      if (
+                                        confirm("Delete this assignment rule?")
+                                      ) {
+                                        deleteAssignmentRule.mutate({
+                                          id: rule.id,
+                                        });
+                                      }
+                                    }}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      },
+                    )}
+                  </div>
+                );
+              })()
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                  <Settings className="h-8 w-8 text-slate-400" />
+                </div>
+                <h3 className="text-lg font-medium">
+                  No assignment rules configured
+                </h3>
+                <p className="text-muted-foreground mt-2 max-w-md">
+                  Add a rule to automatically assign leads to agents based on
+                  different strategies.
+                </p>
+                <Button
+                  onClick={() => {
+                    setEditingRule(null);
+                    setIsAssignmentDialogOpen(true);
+                  }}
+                  className="mt-4"
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Add Your First Rule
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Webhook Logs */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Activity className="h-5 w-5" />
+                  Recent Webhook Activity
+                </CardTitle>
+                <CardDescription>
+                  Latest leads received via webhook from various sources.
+                  Showing {webhookLogs.length} of {totalLogs} total logs.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            {webhookLogs && webhookLogs.length > 0 ? (
+              <div className="space-y-3">
+                {webhookLogs.map((log: any) => (
+                  <div
+                    key={log.id}
+                    className="flex items-start justify-between rounded-lg border p-4 transition-colors hover:bg-slate-50 dark:hover:bg-slate-900"
+                  >
+                    <div className="flex-1">
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className="font-medium">
+                          {log.lead.firstName} {log.lead.lastName}
+                        </span>
+                        {log.lead.source && (
+                          <Badge variant="outline" className="text-xs">
+                            {log.lead.source}
+                          </Badge>
+                        )}
+                        {log.lead.status && (
+                          <Badge variant="secondary" className="text-xs">
+                            {log.lead.status}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-muted-foreground flex flex-wrap items-center gap-4 text-sm">
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium">Phone:</span>
+                          <span>{log.lead.phone}</span>
+                        </div>
+                        {log.lead.email && (
+                          <div className="flex items-center gap-1">
+                            <span className="font-medium">Email:</span>
+                            <span>{log.lead.email}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium">Time:</span>
+                          <span>
+                            {new Date(log.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-muted-foreground mt-2 text-sm">
+                        {log.message}
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="sm" asChild>
+                      <a href={`/dashboard/leads/${log.lead.id}`}>View</a>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                  <Activity className="h-8 w-8 text-slate-400" />
+                </div>
+                <h3 className="text-lg font-medium">No webhook activity yet</h3>
+                <p className="text-muted-foreground mt-2 max-w-md">
+                  Send a test webhook to see logs here.
+                </p>
+              </div>
+            )}
+          </CardContent>
+          {totalPages > 1 && (
+            <CardFooter className="flex items-center justify-between border-t">
+              <div className="text-muted-foreground text-sm">
+                Page {logsPage} of {totalPages}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLogsPage((prev) => Math.max(1, prev - 1))}
+                  disabled={logsPage === 1}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setLogsPage((prev) => Math.min(totalPages, prev + 1))
+                  }
+                  disabled={logsPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </CardFooter>
+          )}
+        </Card>
+
+        {/* Assignment Rule Dialog */}
+        <Dialog
+          open={isAssignmentDialogOpen}
+          onOpenChange={setIsAssignmentDialogOpen}
+        >
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Add Auto-Assignment Rule</DialogTitle>
+              <DialogDescription>
+                Configure automatic lead assignment with Round Robin,
+                Percentage-based, or direct assignment strategies.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="assignmentType">Assignment Strategy</Label>
+                <Select
+                  onValueChange={(value) => {
+                    setEditingRule((prev: any) => ({
+                      ...prev,
+                      assignmentType: value,
+                    }));
+                  }}
+                  defaultValue="SPECIFIC"
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select strategy" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SPECIFIC">
+                      Specific Agent - Always assign to this agent
+                    </SelectItem>
+                    <SelectItem value="ROUND_ROBIN">
+                      Round Robin - Distribute evenly in rotation
+                    </SelectItem>
+                    <SelectItem value="PERCENTAGE">
+                      Percentage - Assign based on percentage
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-muted-foreground text-xs">
+                  {editingRule?.assignmentType === "ROUND_ROBIN" &&
+                    "Leads will be distributed evenly among all Round Robin agents"}
+                  {editingRule?.assignmentType === "PERCENTAGE" &&
+                    "Set percentage for this agent (total should equal 100%)"}
+                  {(!editingRule?.assignmentType ||
+                    editingRule?.assignmentType === "SPECIFIC") &&
+                    "All matching leads will go to this agent"}
+                </p>
+              </div>
+
+              {editingRule?.assignmentType === "PERCENTAGE" && (
+                <div className="space-y-2">
+                  <Label htmlFor="percentage">Percentage</Label>
+                  <Input
+                    id="percentage"
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="50"
+                    onChange={(e) => {
+                      const newPercentage = parseInt(e.target.value) || 0;
+                      setEditingRule((prev: any) => ({
+                        ...prev,
+                        percentage: newPercentage,
+                      }));
+                    }}
+                  />
+                  {(() => {
+                    // Calculate current allocation for selected source
+                    const selectedSource = editingRule?.source || "All Sources";
+                    const existingRulesForSource =
+                      assignmentRules?.filter(
+                        (r: any) =>
+                          r.assignmentType === "PERCENTAGE" &&
+                          (r.source || "All Sources") === selectedSource,
+                      ) || [];
+
+                    const currentTotal = existingRulesForSource.reduce(
+                      (sum: number, r: any) => sum + (r.percentage || 0),
+                      0,
+                    );
+                    const newTotal =
+                      currentTotal + (editingRule?.percentage || 0);
+                    const remaining = 100 - newTotal;
+
+                    return (
+                      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs dark:border-blue-800 dark:bg-blue-950/50">
+                        <div className="mb-1 flex items-center justify-between">
+                          <span className="text-muted-foreground">
+                            Current allocation for{" "}
+                            <strong>{selectedSource}</strong>:
+                          </span>
+                          <span className="font-semibold">{currentTotal}%</span>
+                        </div>
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-muted-foreground">
+                            After adding this rule:
+                          </span>
+                          <span
+                            className={`font-semibold ${
+                              newTotal === 100
+                                ? "text-green-600"
+                                : newTotal < 100
+                                  ? "text-yellow-600"
+                                  : "text-red-600"
+                            }`}
+                          >
+                            {newTotal}%
+                          </span>
+                        </div>
+                        {remaining > 0 && (
+                          <div className="text-yellow-700">
+                            ⚠ {remaining}% will remain unassigned
+                          </div>
+                        )}
+                        {remaining < 0 && (
+                          <div className="text-red-700">
+                            ⚠ Over-allocated by {Math.abs(remaining)}%
+                          </div>
+                        )}
+                        {remaining === 0 && (
+                          <div className="text-green-700">
+                            ✓ 100% allocation complete
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="assignee">Assign To Agent</Label>
+                <Select
+                  onValueChange={(value) => {
+                    setEditingRule((prev: any) => ({
+                      ...prev,
+                      assigneeId: value,
+                    }));
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select an agent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users?.map((user: any) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name} ({user.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="source">Lead Source (Optional)</Label>
+                <div className="space-y-2">
+                  <Select
+                    onValueChange={(value) => {
+                      if (value === "CUSTOM") {
+                        setEditingRule((prev: any) => ({
+                          ...prev,
+                          sourceType: "custom",
+                          source: "",
+                        }));
+                      } else {
+                        setEditingRule((prev: any) => ({
+                          ...prev,
+                          sourceType: "preset",
+                          source: value === "ALL" ? null : value,
+                        }));
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All sources" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All Sources</SelectItem>
+                      <SelectItem value="WEBSITE">Website</SelectItem>
+                      <SelectItem value="FACEBOOK">Facebook</SelectItem>
+                      <SelectItem value="GOOGLE_ADS">Google Ads</SelectItem>
+                      <SelectItem value="INSTAGRAM">Instagram</SelectItem>
+                      <SelectItem value="LINKEDIN">LinkedIn</SelectItem>
+                      <SelectItem value="REFERRAL">Referral</SelectItem>
+                      <SelectItem value="WEBHOOK">Webhook</SelectItem>
+                      <SelectItem value="PHONE_INQUIRY">Phone</SelectItem>
+                      <SelectItem value="EMAIL_CAMPAIGN">Email</SelectItem>
+                      <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
+                      <SelectItem value="WALK_IN">Walk-in</SelectItem>
+                      <SelectItem value="CUSTOM">
+                        🎨 Custom Source...
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {editingRule?.sourceType === "custom" && (
+                    <Input
+                      placeholder="Enter custom source name (e.g., 'Facebook Lead Ad', 'Justdial')"
+                      onChange={(e) => {
+                        setEditingRule((prev: any) => ({
+                          ...prev,
+                          source: e.target.value,
+                        }));
+                      }}
+                    />
+                  )}
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  Percentage allocation is calculated per source. Select the
+                  source first to see current allocation.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="campaign">Assign to Campaign (Optional)</Label>
+                <Select
+                  onValueChange={(value) => {
+                    setEditingRule((prev: any) => ({
+                      ...prev,
+                      campaignId: value === "NONE" ? null : value,
+                    }));
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="No campaign" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">No Campaign</SelectItem>
+                    {campaigns
+                      ?.filter((c: any) => c.status !== "COMPLETED")
+                      .map((campaign: any) => (
+                        <SelectItem key={campaign.id} value={campaign.id}>
+                          {campaign.name} ({campaign.status})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-muted-foreground text-xs">
+                  Leads matching this source will be automatically added to the
+                  selected campaign
+                </p>
+              </div>
+
+              {editingRule?.assignmentType !== "PERCENTAGE" && (
+                <div className="space-y-2">
+                  <Label htmlFor="priority">Rule Priority</Label>
+                  <Input
+                    id="priority"
+                    type="number"
+                    placeholder="0"
+                    defaultValue={0}
+                    onChange={(e) => {
+                      setEditingRule((prev: any) => ({
+                        ...prev,
+                        rulePriority: parseInt(e.target.value) || 0,
+                      }));
+                    }}
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    Lower = higher priority. Used when multiple{" "}
+                    {editingRule?.assignmentType || "SPECIFIC"} rules match.
+                  </p>
+                </div>
+              )}
+
+              <Separator />
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsAssignmentDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (!editingRule?.assigneeId) {
+                      toast.error("Please select an agent");
+                      return;
+                    }
+                    if (
+                      editingRule?.assignmentType === "PERCENTAGE" &&
+                      (!editingRule?.percentage || editingRule.percentage <= 0)
+                    ) {
+                      toast.error("Please enter a valid percentage (1-100)");
+                      return;
+                    }
+                    upsertAssignmentRule.mutate({
+                      assigneeId: editingRule.assigneeId,
+                      source: editingRule.source,
+                      campaignId: editingRule.campaignId,
+                      assignmentType: editingRule.assignmentType || "SPECIFIC",
+                      percentage: editingRule.percentage,
+                      rulePriority: editingRule.rulePriority || 0,
+                      isEnabled: true,
+                    });
+                  }}
+                  disabled={upsertAssignmentRule.isPending}
+                >
+                  {upsertAssignmentRule.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Save Rule
+                </Button>
+              </DialogFooter>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </PageContainer>
+  );
+}

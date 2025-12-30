@@ -8,48 +8,43 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
 import { api } from "@/trpc/react";
 import { toast } from "sonner";
 import {
-  Loader2,
-  Plus,
-  Pencil,
   Copy,
   Webhook,
-  Settings,
   Shield,
   Activity,
+  FileCode,
+  ExternalLink,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Image from "next/image";
 
 export default function WebhooksPage() {
   const [webhookUrl, setWebhookUrl] = useState("");
-  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
-  const [editingRule, setEditingRule] = useState<any>(null);
   const [logsPage, setLogsPage] = useState(1);
+  const [selectedFields, setSelectedFields] = useState<string[]>([
+    "firstName",
+    "phone",
+  ]);
+  const [n8nOpen, setN8nOpen] = useState(false);
+  const [pabblyOpen, setPabblyOpen] = useState(false);
   const logsPerPage = 10;
 
   // Get current workspace
@@ -77,7 +72,6 @@ export default function WebhooksPage() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-
     toast.success("Copied to clipboard!");
   };
 
@@ -89,27 +83,8 @@ export default function WebhooksPage() {
   const webhookLogs = webhookLogsData?.logs || [];
   const totalLogs = webhookLogsData?.total || 0;
   const totalPages = Math.ceil(totalLogs / logsPerPage);
-  const { data: assignmentRules } = api.webhook.getAssignmentRules.useQuery();
-  const { data: users } = api.user.getAll.useQuery();
 
-  const upsertAssignmentRule = api.webhook.upsertAssignmentRule.useMutation({
-    onSuccess: () => {
-      toast.success("Assignment rule saved");
-      setIsAssignmentDialogOpen(false);
-      setEditingRule(null);
-      utils.webhook.getAssignmentRules.invalidate();
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
-
-  const deleteAssignmentRule = api.webhook.deleteAssignmentRule.useMutation({
-    onSuccess: () => {
-      toast.success("Assignment rule deleted");
-      utils.webhook.getAssignmentRules.invalidate();
-    },
-  });
+  const { data: leadFields } = api.webhook.getLeadFields.useQuery();
 
   const generateWebhookToken = api.workspace.generateWebhookToken.useMutation({
     onSuccess: () => {
@@ -132,78 +107,204 @@ export default function WebhooksPage() {
       },
     });
 
-  const toggleAssignmentRule = api.webhook.toggleAssignmentRule.useMutation({
-    onSuccess: () => {
-      utils.webhook.getAssignmentRules.invalidate();
-    },
-  });
+  // Standard fields
+  const standardFields = [
+    { key: "firstName", label: "First Name", required: true },
+    { key: "lastName", label: "Last Name", required: false },
+    { key: "email", label: "Email", required: false },
+    { key: "phone", label: "Phone", required: true },
+    { key: "source", label: "Source", required: false },
+    { key: "status", label: "Status", required: false },
+    { key: "priority", label: "Priority", required: false },
+    { key: "city", label: "City", required: false },
+    { key: "state", label: "State", required: false },
+    { key: "country", label: "Country", required: false },
+    { key: "courseInterested", label: "Course Interested", required: false },
+    { key: "tags", label: "Tags", required: false },
+    { key: "campaign", label: "Campaign", required: false },
+  ];
+
+  const toggleField = (field: string) => {
+    if (field === "firstName" || field === "phone") {
+      toast.error("This field is required and cannot be deselected");
+      return;
+    }
+    setSelectedFields((prev) =>
+      prev.includes(field) ? prev.filter((f) => f !== field) : [...prev, field],
+    );
+  };
+
+  // Generate sample JSON based on selected fields
+  const generateSampleJSON = () => {
+    const sample: any = {};
+
+    selectedFields.forEach((field) => {
+      const standardField = standardFields.find((f) => f.key === field);
+      if (standardField) {
+        switch (field) {
+          case "firstName":
+            sample.firstName = "John";
+            break;
+          case "lastName":
+            sample.lastName = "Doe";
+            break;
+          case "email":
+            sample.email = "john@example.com";
+            break;
+          case "phone":
+            sample.phone = "1234567890";
+            break;
+          case "source":
+            sample.source = "Website";
+            break;
+          case "status":
+            sample.status = "NEW";
+            break;
+          case "priority":
+            sample.priority = "MEDIUM";
+            break;
+          case "city":
+            sample.city = "Mumbai";
+            break;
+          case "state":
+            sample.state = "Maharashtra";
+            break;
+          case "country":
+            sample.country = "India";
+            break;
+          case "courseInterested":
+            sample.courseInterested = "Web Development";
+            break;
+          case "tags":
+            sample.tags = "Premium,Urgent";
+            break;
+          case "campaign":
+            sample.campaign = "Summer Campaign 2025";
+            break;
+        }
+      }
+    });
+
+    // Add selected custom fields
+    if (leadFields) {
+      leadFields.forEach((field: any) => {
+        if (selectedFields.includes(field.key)) {
+          if (!sample.customFields) {
+            sample.customFields = {};
+          }
+          sample.customFields[field.key] =
+            field.type === "NUMBER" ? 0 : "value";
+        }
+      });
+    }
+
+    return JSON.stringify(sample, null, 2);
+  };
+
+  // Generate cURL command with minified JSON
+  const generateCurlCommand = () => {
+    const sample: any = {};
+
+    selectedFields.forEach((field) => {
+      const standardField = standardFields.find((f) => f.key === field);
+      if (standardField) {
+        switch (field) {
+          case "firstName":
+            sample.firstName = "John";
+            break;
+          case "lastName":
+            sample.lastName = "Doe";
+            break;
+          case "email":
+            sample.email = "john@example.com";
+            break;
+          case "phone":
+            sample.phone = "1234567890";
+            break;
+          case "source":
+            sample.source = "Website";
+            break;
+          case "status":
+            sample.status = "NEW";
+            break;
+          case "priority":
+            sample.priority = "MEDIUM";
+            break;
+          case "city":
+            sample.city = "Mumbai";
+            break;
+          case "state":
+            sample.state = "Maharashtra";
+            break;
+          case "country":
+            sample.country = "India";
+            break;
+          case "courseInterested":
+            sample.courseInterested = "Web Development";
+            break;
+          case "tags":
+            sample.tags = "Premium,Urgent";
+            break;
+          case "campaign":
+            sample.campaign = "Summer Campaign 2025";
+            break;
+        }
+      }
+    });
+
+    // Add selected custom fields
+    if (leadFields) {
+      leadFields.forEach((field: any) => {
+        if (selectedFields.includes(field.key)) {
+          if (!sample.customFields) {
+            sample.customFields = {};
+          }
+          sample.customFields[field.key] =
+            field.type === "NUMBER" ? 0 : "value";
+        }
+      });
+    }
+
+    // Minified JSON (no spaces or newlines)
+    const minifiedJson = JSON.stringify(sample);
+
+    return `curl -X POST '${webhookUrl}' \\
+  -H 'Content-Type: application/json' \\
+  -H 'x-workspace-id: ${currentWorkspace?.id || "YOUR_WORKSPACE_ID"}' \\
+  -H 'x-webhook-token: ${currentWorkspace?.webhookToken || "YOUR_WEBHOOK_TOKEN"}' \\
+  -d '${minifiedJson}'`;
+  };
 
   return (
-    <PageContainer>
-      <div className="space-y-8">
+    <PageContainer scrollable>
+      <div className="space-y-8 pb-6">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">
-              Webhooks & Auto-Assignment
+              Webhook Configuration
             </h2>
             <p className="text-muted-foreground mt-2">
-              Configure webhook integrations and automatic lead assignment
-              rules.
+              Receive leads automatically from external sources like Pabbly,
+              n8n, Zapier, Make.com, and more
             </p>
           </div>
         </div>
 
-        <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 dark:border-blue-800 dark:from-blue-950/50 dark:to-indigo-950/50">
-          <CardContent className="">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900">
-                  <Shield className="h-5 w-5 text-blue-600 dark:text-blue-300" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                    Current Workspace ID
-                  </p>
-                  <p className="text-xs text-blue-700/70 dark:text-blue-300/70">
-                    Use this ID in the x-workspace-id header for webhook
-                    requests
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <code className="rounded-lg bg-blue-100 px-4 py-2 font-mono text-sm text-blue-900 dark:bg-blue-900 dark:text-blue-100">
-                  {currentWorkspace?.id || "Loading..."}
-                </code>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => copyToClipboard(currentWorkspace?.id || "")}
-                  className="bg-white/50 hover:bg-white dark:bg-black/20 dark:hover:bg-black/40"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Webhook URL Section */}
-        <Card className="overflow-hidden">
+        {/* Webhook Endpoint Card */}
+        <Card>
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-700">
-                <Webhook className="h-4 w-4" />
-              </div>
-              <CardTitle className="text-xl">Lead Webhook URL</CardTitle>
-            </div>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Webhook className="h-5 w-5" />
+              Webhook Endpoint
+            </CardTitle>
             <CardDescription>
-              Use this webhook URL to receive new leads from Pabbly, Zapier,
-              Make.com, or any other automation platform.
+              Use this webhook URL to receive new leads from automation
+              platforms
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 pt-6">
             <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-900">
-              <Label className="text-sm font-medium">Webhook Endpoint</Label>
+              <Label className="text-sm font-medium">Webhook URL</Label>
               <div className="mt-2 flex gap-2">
                 <Input
                   value={webhookUrl}
@@ -262,9 +363,6 @@ export default function WebhooksPage() {
                       disabled={generateWebhookToken.isPending}
                       className="bg-yellow-600 hover:bg-yellow-700"
                     >
-                      {generateWebhookToken.isPending && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      )}
                       Generate Token
                     </Button>
                   )}
@@ -283,10 +381,7 @@ export default function WebhooksPage() {
                       }}
                       disabled={regenerateWebhookToken.isPending}
                     >
-                      {regenerateWebhookToken.isPending && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      )}
-                      Regenerate
+                      Regenerate Token
                     </Button>
                   )}
                 </div>
@@ -358,243 +453,326 @@ export default function WebhooksPage() {
                 </div>
               </div>
             </div>
-
-            <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-900">
-              <h3 className="mb-3 font-medium">Optional Fields</h3>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  "lastName",
-                  "email",
-                  "source",
-                  "status",
-                  "priority",
-                  "city",
-                  "state",
-                  "country",
-                  "courseInterested",
-                  "tags",
-                  "campaign",
-                ].map((field) => (
-                  <Badge key={field} variant="outline" className="text-xs">
-                    {field}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 dark:border-blue-800 dark:from-blue-950/50 dark:to-indigo-950/50">
-              <p className="text-sm text-blue-900 dark:text-blue-100">
-                <strong>💡 Tip:</strong> Test your webhook by sending a POST
-                request with the required headers and fields. The endpoint will
-                create or update leads automatically.
-              </p>
-            </div>
           </CardContent>
         </Card>
 
-        {/* Auto-Assignment Rules */}
+        {/* Field Selector Card */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <Settings className="h-5 w-5" />
-                  Auto-Assignment Rules
-                </CardTitle>
-                <CardDescription>
-                  Configure automatic lead assignment with Round Robin,
-                  Percentage, or Direct strategies.
-                </CardDescription>
-              </div>
-              <Button
-                onClick={() => {
-                  setEditingRule(null);
-                  setIsAssignmentDialogOpen(true);
-                }}
-                size="sm"
-              >
-                <Plus className="mr-2 h-4 w-4" /> Add Rule
-              </Button>
-            </div>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <FileCode className="h-5 w-5" />
+              Select Fields to Send
+            </CardTitle>
+            <CardDescription>
+              Choose which fields you want to send in your webhook payload.
+              Generate sample JSON and cURL command.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="pt-6">
-            {assignmentRules && assignmentRules.length > 0 ? (
-              (() => {
-                // Group rules by source
-                const groupedRules = assignmentRules.reduce(
-                  (acc: any, rule: any) => {
-                    const sourceKey = rule.source || "All Sources";
-                    if (!acc[sourceKey]) acc[sourceKey] = [];
-                    acc[sourceKey].push(rule);
-                    return acc;
-                  },
-                  {},
-                );
-
-                return (
-                  <div className="space-y-6">
-                    {Object.entries(groupedRules).map(
-                      ([source, rules]: [string, any]) => {
-                        // Calculate percentage totals for this source
-                        const percentageRules = rules.filter(
-                          (r: any) => r.assignmentType === "PERCENTAGE",
-                        );
-                        const totalPercentage = percentageRules.reduce(
-                          (sum: number, r: any) => sum + (r.percentage || 0),
-                          0,
-                        );
-                        const remainingPercentage = 100 - totalPercentage;
-
-                        return (
-                          <div key={source} className="space-y-3">
-                            {/* Source Header with Stats */}
-                            <div className="flex items-center justify-between rounded-lg bg-slate-50 p-4 dark:bg-slate-900">
-                              <div className="flex items-center gap-3">
-                                <Badge
-                                  variant="secondary"
-                                  className="px-3 py-1 text-sm"
-                                >
-                                  {source}
-                                </Badge>
-                                <span className="text-muted-foreground text-sm">
-                                  {rules.length} rule
-                                  {rules.length > 1 ? "s" : ""}
-                                </span>
-                              </div>
-                              {percentageRules.length > 0 && (
-                                <div className="flex items-center gap-2">
-                                  {totalPercentage === 100 ? (
-                                    <Badge
-                                      variant="outline"
-                                      className="border-green-200 bg-green-50 text-green-700"
-                                    >
-                                      ✓ 100% Allocated
-                                    </Badge>
-                                  ) : totalPercentage < 100 ? (
-                                    <Badge
-                                      variant="outline"
-                                      className="border-yellow-200 bg-yellow-50 text-yellow-700"
-                                    >
-                                      ⚠ {remainingPercentage}% Unassigned
-                                    </Badge>
-                                  ) : (
-                                    <Badge
-                                      variant="outline"
-                                      className="border-red-200 bg-red-50 text-red-700"
-                                    >
-                                      ⚠ Over-allocated by{" "}
-                                      {totalPercentage - 100}%
-                                    </Badge>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Rules for this source */}
-                            <div className="ml-4 space-y-3">
-                              {rules.map((rule: any) => (
-                                <div
-                                  key={rule.id}
-                                  className="flex items-center justify-between rounded-lg border bg-white p-4 shadow-sm dark:bg-slate-950"
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <Switch
-                                      checked={rule.isEnabled}
-                                      onCheckedChange={(checked) =>
-                                        toggleAssignmentRule.mutate({
-                                          id: rule.id,
-                                          isEnabled: checked,
-                                        })
-                                      }
-                                    />
-                                    <div>
-                                      <div className="flex items-center gap-2">
-                                        <span className="font-medium">
-                                          {rule.assignee.name}
-                                        </span>
-                                        {rule.assignmentType ===
-                                          "ROUND_ROBIN" && (
-                                          <Badge
-                                            variant="outline"
-                                            className="border-blue-200 bg-blue-50 text-blue-700"
-                                          >
-                                            🔄 Round Robin
-                                          </Badge>
-                                        )}
-                                        {rule.assignmentType ===
-                                          "PERCENTAGE" && (
-                                          <Badge
-                                            variant="outline"
-                                            className="border-green-200 bg-green-50 text-green-700"
-                                          >
-                                            📊 {rule.percentage}%
-                                          </Badge>
-                                        )}
-                                        {(!rule.assignmentType ||
-                                          rule.assignmentType ===
-                                            "SPECIFIC") && (
-                                          <Badge
-                                            variant="outline"
-                                            className="border-purple-200 bg-purple-50 text-purple-700"
-                                          >
-                                            🎯 Direct
-                                          </Badge>
-                                        )}
-                                      </div>
-                                      <p className="text-muted-foreground mt-1 text-sm">
-                                        {rule.assignmentCount > 0 &&
-                                          `${rule.assignmentCount} leads assigned`}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => {
-                                      if (
-                                        confirm("Delete this assignment rule?")
-                                      ) {
-                                        deleteAssignmentRule.mutate({
-                                          id: rule.id,
-                                        });
-                                      }
-                                    }}
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      },
-                    )}
-                  </div>
-                );
-              })()
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-                  <Settings className="h-8 w-8 text-slate-400" />
+          <CardContent className="space-y-6 pt-6">
+            <div className="space-y-4">
+              <div>
+                <h3 className="mb-3 font-medium">Standard Fields</h3>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {standardFields.map((field) => (
+                    <div
+                      key={field.key}
+                      className="flex items-center space-x-2"
+                    >
+                      <Checkbox
+                        id={field.key}
+                        checked={selectedFields.includes(field.key)}
+                        onCheckedChange={() => toggleField(field.key)}
+                        disabled={field.required}
+                      />
+                      <Label
+                        htmlFor={field.key}
+                        className="cursor-pointer text-sm font-normal"
+                      >
+                        {field.label}
+                        {field.required && (
+                          <span className="ml-1 text-red-500">*</span>
+                        )}
+                      </Label>
+                    </div>
+                  ))}
                 </div>
-                <h3 className="text-lg font-medium">
-                  No assignment rules configured
-                </h3>
-                <p className="text-muted-foreground mt-2 max-w-md">
-                  Add a rule to automatically assign leads to agents based on
-                  different strategies.
-                </p>
-                <Button
-                  onClick={() => {
-                    setEditingRule(null);
-                    setIsAssignmentDialogOpen(true);
-                  }}
-                  className="mt-4"
-                >
-                  <Plus className="mr-2 h-4 w-4" /> Add Your First Rule
-                </Button>
               </div>
-            )}
+
+              {leadFields && leadFields.length > 0 && (
+                <div>
+                  <h3 className="mb-3 font-medium">Custom Fields</h3>
+                  <p className="text-muted-foreground mb-3 text-xs">
+                    These fields are defined in your workspace settings
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {leadFields.map((field: any) => (
+                      <div
+                        key={field.key}
+                        className="flex items-center space-x-2"
+                      >
+                        <Checkbox
+                          id={`custom-${field.key}`}
+                          checked={selectedFields.includes(field.key)}
+                          onCheckedChange={() => toggleField(field.key)}
+                        />
+                        <Label
+                          htmlFor={`custom-${field.key}`}
+                          className="cursor-pointer text-sm font-normal"
+                        >
+                          {field.name}
+                          {field.isRequired && (
+                            <span className="ml-1 text-red-500">*</span>
+                          )}
+                          <Badge variant="secondary" className="ml-2 text-xs">
+                            {field.type}
+                          </Badge>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            <Tabs defaultValue="json" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="json">Sample JSON</TabsTrigger>
+                <TabsTrigger value="curl">cURL Command</TabsTrigger>
+              </TabsList>
+              <TabsContent value="json" className="space-y-4">
+                <div className="rounded-lg bg-slate-950 p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs text-slate-400">
+                      Sample Payload
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(generateSampleJSON())}
+                    >
+                      <Copy className="mr-2 h-3 w-3" />
+                      Copy
+                    </Button>
+                  </div>
+                  <div className="max-h-96 overflow-auto">
+                    <pre className="text-xs break-words whitespace-pre-wrap text-green-400">
+                      <code>{generateSampleJSON()}</code>
+                    </pre>
+                  </div>
+                </div>
+              </TabsContent>
+              <TabsContent value="curl" className="space-y-4">
+                <div className="rounded-lg bg-slate-950 p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs text-slate-400">
+                      cURL Command (Import into n8n/Pabbly)
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(generateCurlCommand())}
+                    >
+                      <Copy className="mr-2 h-3 w-3" />
+                      Copy
+                    </Button>
+                  </div>
+                  <div className="max-h-96 overflow-auto">
+                    <pre className="text-xs break-all whitespace-pre-wrap text-green-400">
+                      <code className="break-all">{generateCurlCommand()}</code>
+                    </pre>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950/50">
+                  <p className="text-sm text-blue-900 dark:text-blue-100">
+                    <strong>💡 Tip:</strong> Copy this cURL command and use the
+                    "Import cURL" feature in n8n or Pabbly to automatically
+                    configure your webhook node.
+                  </p>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* Integration Guides */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <ExternalLink className="h-5 w-5" />
+              Integration Guides
+            </CardTitle>
+            <CardDescription>
+              Step-by-step instructions to connect with popular automation tools
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-6">
+            {/* n8n Guide */}
+            <Collapsible open={n8nOpen} onOpenChange={setN8nOpen}>
+              <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border p-4 hover:bg-slate-50 dark:hover:bg-slate-900">
+                <div className="flex items-center gap-3">
+                  <Image
+                    src="/n8n.png"
+                    alt="n8n"
+                    width={32}
+                    height={32}
+                    className="rounded"
+                  />
+                  <div className="text-left">
+                    <h3 className="font-semibold">n8n Integration</h3>
+                    <p className="text-muted-foreground text-sm">
+                      Connect your n8n workflows
+                    </p>
+                  </div>
+                </div>
+                {n8nOpen ? (
+                  <ChevronDown className="h-5 w-5" />
+                ) : (
+                  <ChevronRight className="h-5 w-5" />
+                )}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="px-4 pt-4">
+                <div className="space-y-4 rounded-lg border p-4">
+                  <ol className="list-inside list-decimal space-y-3 text-sm">
+                    <li>
+                      <strong>Open n8n</strong> and create a new workflow
+                    </li>
+                    <li>
+                      Add an <Badge variant="secondary">HTTP Request</Badge>{" "}
+                      node to your workflow
+                    </li>
+                    <li>
+                      <strong>Import cURL:</strong> Click on the HTTP Request
+                      node, then click the <Badge>Import from cURL</Badge>{" "}
+                      button
+                    </li>
+                    <li>
+                      Paste the cURL command from the "cURL Command" tab above
+                    </li>
+                    <li>
+                      n8n will automatically configure:
+                      <ul className="mt-1 ml-6 list-disc space-y-1">
+                        <li>POST method</li>
+                        <li>Webhook URL</li>
+                        <li>
+                          Required headers (x-workspace-id, x-webhook-token)
+                        </li>
+                        <li>Sample JSON body</li>
+                      </ul>
+                    </li>
+                    <li>
+                      <strong>Customize</strong> the body data with your actual
+                      data sources
+                    </li>
+                    <li>
+                      <strong>Test</strong> the workflow - check the Recent
+                      Webhook Activity section below
+                    </li>
+                    <li>
+                      <strong>Activate</strong> the workflow when ready
+                    </li>
+                  </ol>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Pabbly Guide */}
+            <Collapsible open={pabblyOpen} onOpenChange={setPabblyOpen}>
+              <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border p-4 hover:bg-slate-50 dark:hover:bg-slate-900">
+                <div className="flex items-center gap-3">
+                  <Image
+                    src="/pably.png"
+                    alt="Pabbly"
+                    width={32}
+                    height={32}
+                    className="rounded"
+                  />
+                  <div className="text-left">
+                    <h3 className="font-semibold">
+                      Pabbly Connect Integration
+                    </h3>
+                    <p className="text-muted-foreground text-sm">
+                      Connect your Pabbly workflows
+                    </p>
+                  </div>
+                </div>
+                {pabblyOpen ? (
+                  <ChevronDown className="h-5 w-5" />
+                ) : (
+                  <ChevronRight className="h-5 w-5" />
+                )}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="px-4 pt-4">
+                <div className="space-y-4 rounded-lg border p-4">
+                  <ol className="list-inside list-decimal space-y-3 text-sm">
+                    <li>
+                      <strong>Open Pabbly Connect</strong> and create a new
+                      workflow
+                    </li>
+                    <li>
+                      Add a trigger (e.g., Google Forms, Facebook Lead Ads,
+                      etc.)
+                    </li>
+                    <li>
+                      Add an action step:{" "}
+                      <Badge variant="secondary">API by Pabbly</Badge> →{" "}
+                      <Badge>POST</Badge>
+                    </li>
+                    <li>
+                      <strong>Import cURL:</strong> Look for the{" "}
+                      <Badge>Import cURL</Badge> option in the API action
+                    </li>
+                    <li>
+                      Paste the cURL command from the "cURL Command" tab above
+                    </li>
+                    <li>
+                      Pabbly will automatically fill in:
+                      <ul className="mt-1 ml-6 list-disc space-y-1">
+                        <li>Request URL</li>
+                        <li>Headers section</li>
+                        <li>Body parameters</li>
+                      </ul>
+                    </li>
+                    <li>
+                      <strong>Map fields</strong> from your trigger to the body
+                      parameters
+                    </li>
+                    <li>
+                      <strong>Test</strong> the connection - verify in Recent
+                      Webhook Activity below
+                    </li>
+                    <li>
+                      <strong>Save & Activate</strong> the workflow
+                    </li>
+                  </ol>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* Other Platforms */}
+            <div className="rounded-lg border p-4">
+              <h3 className="mb-2 font-semibold">Other Platforms</h3>
+              <p className="text-muted-foreground mb-3 text-sm">
+                Most automation platforms support cURL import or HTTP/Webhook
+                nodes:
+              </p>
+              <ul className="list-inside list-disc space-y-1 text-sm">
+                <li>
+                  <strong>Zapier:</strong> Use "Webhooks by Zapier" → "POST"
+                </li>
+                <li>
+                  <strong>Make.com:</strong> Use "HTTP" module → "Make a
+                  request"
+                </li>
+                <li>
+                  <strong>Integromat:</strong> Use "HTTP" module
+                </li>
+                <li>
+                  <strong>Custom Scripts:</strong> Copy the cURL command above
+                </li>
+              </ul>
+            </div>
           </CardContent>
         </Card>
 
@@ -656,15 +834,33 @@ export default function WebhooksPage() {
                           </span>
                         </div>
                       </div>
-                      <p className="text-muted-foreground mt-2 text-sm">
-                        {log.message}
-                      </p>
                     </div>
-                    <Button variant="ghost" size="sm" asChild>
-                      <a href={`/dashboard/leads/${log.lead.id}`}>View</a>
-                    </Button>
                   </div>
                 ))}
+
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLogsPage(logsPage - 1)}
+                      disabled={logsPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-muted-foreground text-sm">
+                      Page {logsPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLogsPage(logsPage + 1)}
+                      disabled={logsPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -673,319 +869,13 @@ export default function WebhooksPage() {
                 </div>
                 <h3 className="text-lg font-medium">No webhook activity yet</h3>
                 <p className="text-muted-foreground mt-2 max-w-md">
-                  Send a test webhook to see logs here.
+                  Webhook activity will appear here once you start receiving
+                  leads from your automation platforms.
                 </p>
               </div>
             )}
           </CardContent>
-          {totalPages > 1 && (
-            <CardFooter className="flex items-center justify-between border-t">
-              <div className="text-muted-foreground text-sm">
-                Page {logsPage} of {totalPages}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setLogsPage((prev) => Math.max(1, prev - 1))}
-                  disabled={logsPage === 1}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setLogsPage((prev) => Math.min(totalPages, prev + 1))
-                  }
-                  disabled={logsPage === totalPages}
-                >
-                  Next
-                </Button>
-              </div>
-            </CardFooter>
-          )}
         </Card>
-
-        {/* Assignment Rule Dialog */}
-        <Dialog
-          open={isAssignmentDialogOpen}
-          onOpenChange={setIsAssignmentDialogOpen}
-        >
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Add Auto-Assignment Rule</DialogTitle>
-              <DialogDescription>
-                Configure automatic lead assignment with Round Robin,
-                Percentage-based, or direct assignment strategies.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-6 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="assignmentType">Assignment Strategy</Label>
-                <Select
-                  onValueChange={(value) => {
-                    setEditingRule((prev: any) => ({
-                      ...prev,
-                      assignmentType: value,
-                    }));
-                  }}
-                  defaultValue="SPECIFIC"
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select strategy" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SPECIFIC">
-                      Specific Agent - Always assign to this agent
-                    </SelectItem>
-                    <SelectItem value="ROUND_ROBIN">
-                      Round Robin - Distribute evenly in rotation
-                    </SelectItem>
-                    <SelectItem value="PERCENTAGE">
-                      Percentage - Assign based on percentage
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-muted-foreground text-xs">
-                  {editingRule?.assignmentType === "ROUND_ROBIN" &&
-                    "Leads will be distributed evenly among all Round Robin agents"}
-                  {editingRule?.assignmentType === "PERCENTAGE" &&
-                    "Set percentage for this agent (total should equal 100%)"}
-                  {(!editingRule?.assignmentType ||
-                    editingRule?.assignmentType === "SPECIFIC") &&
-                    "All matching leads will go to this agent"}
-                </p>
-              </div>
-
-              {editingRule?.assignmentType === "PERCENTAGE" && (
-                <div className="space-y-2">
-                  <Label htmlFor="percentage">Percentage</Label>
-                  <Input
-                    id="percentage"
-                    type="number"
-                    min="0"
-                    max="100"
-                    placeholder="50"
-                    onChange={(e) => {
-                      const newPercentage = parseInt(e.target.value) || 0;
-                      setEditingRule((prev: any) => ({
-                        ...prev,
-                        percentage: newPercentage,
-                      }));
-                    }}
-                  />
-                  {(() => {
-                    // Calculate current allocation for selected source
-                    const selectedSource = editingRule?.source || "All Sources";
-                    const existingRulesForSource =
-                      assignmentRules?.filter(
-                        (r: any) =>
-                          r.assignmentType === "PERCENTAGE" &&
-                          (r.source || "All Sources") === selectedSource,
-                      ) || [];
-
-                    const currentTotal = existingRulesForSource.reduce(
-                      (sum: number, r: any) => sum + (r.percentage || 0),
-                      0,
-                    );
-                    const newTotal =
-                      currentTotal + (editingRule?.percentage || 0);
-                    const remaining = 100 - newTotal;
-
-                    return (
-                      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs dark:border-blue-800 dark:bg-blue-950/50">
-                        <div className="mb-1 flex items-center justify-between">
-                          <span className="text-muted-foreground">
-                            Current allocation for{" "}
-                            <strong>{selectedSource}</strong>:
-                          </span>
-                          <span className="font-semibold">{currentTotal}%</span>
-                        </div>
-                        <div className="mb-2 flex items-center justify-between">
-                          <span className="text-muted-foreground">
-                            After adding this rule:
-                          </span>
-                          <span
-                            className={`font-semibold ${
-                              newTotal === 100
-                                ? "text-green-600"
-                                : newTotal < 100
-                                  ? "text-yellow-600"
-                                  : "text-red-600"
-                            }`}
-                          >
-                            {newTotal}%
-                          </span>
-                        </div>
-                        {remaining > 0 && (
-                          <div className="text-yellow-700">
-                            ⚠ {remaining}% will remain unassigned
-                          </div>
-                        )}
-                        {remaining < 0 && (
-                          <div className="text-red-700">
-                            ⚠ Over-allocated by {Math.abs(remaining)}%
-                          </div>
-                        )}
-                        {remaining === 0 && (
-                          <div className="text-green-700">
-                            ✓ 100% allocation complete
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="assignee">Assign To Agent</Label>
-                <Select
-                  onValueChange={(value) => {
-                    setEditingRule((prev: any) => ({
-                      ...prev,
-                      assigneeId: value,
-                    }));
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an agent" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {users?.map((user: any) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.name} ({user.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="source">Lead Source (Optional)</Label>
-                <div className="space-y-2">
-                  <Select
-                    onValueChange={(value) => {
-                      if (value === "CUSTOM") {
-                        setEditingRule((prev: any) => ({
-                          ...prev,
-                          sourceType: "custom",
-                          source: "",
-                        }));
-                      } else {
-                        setEditingRule((prev: any) => ({
-                          ...prev,
-                          sourceType: "preset",
-                          source: value === "ALL" ? null : value,
-                        }));
-                      }
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="All sources" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">All Sources</SelectItem>
-                      <SelectItem value="WEBSITE">Website</SelectItem>
-                      <SelectItem value="FACEBOOK">Facebook</SelectItem>
-                      <SelectItem value="GOOGLE_ADS">Google Ads</SelectItem>
-                      <SelectItem value="INSTAGRAM">Instagram</SelectItem>
-                      <SelectItem value="LINKEDIN">LinkedIn</SelectItem>
-                      <SelectItem value="REFERRAL">Referral</SelectItem>
-                      <SelectItem value="WEBHOOK">Webhook</SelectItem>
-                      <SelectItem value="PHONE_INQUIRY">Phone</SelectItem>
-                      <SelectItem value="EMAIL_CAMPAIGN">Email</SelectItem>
-                      <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
-                      <SelectItem value="WALK_IN">Walk-in</SelectItem>
-                      <SelectItem value="CUSTOM">
-                        🎨 Custom Source...
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  {editingRule?.sourceType === "custom" && (
-                    <Input
-                      placeholder="Enter custom source name (e.g., 'Facebook Lead Ad', 'Justdial')"
-                      onChange={(e) => {
-                        setEditingRule((prev: any) => ({
-                          ...prev,
-                          source: e.target.value,
-                        }));
-                      }}
-                    />
-                  )}
-                </div>
-                <p className="text-muted-foreground text-xs">
-                  Percentage allocation is calculated per source. Select the
-                  source first to see current allocation.
-                </p>
-              </div>
-
-              {editingRule?.assignmentType !== "PERCENTAGE" && (
-                <div className="space-y-2">
-                  <Label htmlFor="priority">Rule Priority</Label>
-                  <Input
-                    id="priority"
-                    type="number"
-                    placeholder="0"
-                    defaultValue={0}
-                    onChange={(e) => {
-                      setEditingRule((prev: any) => ({
-                        ...prev,
-                        rulePriority: parseInt(e.target.value) || 0,
-                      }));
-                    }}
-                  />
-                  <p className="text-muted-foreground text-xs">
-                    Lower = higher priority. Used when multiple{" "}
-                    {editingRule?.assignmentType || "SPECIFIC"} rules match.
-                  </p>
-                </div>
-              )}
-
-              <Separator />
-
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsAssignmentDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => {
-                    if (!editingRule?.assigneeId) {
-                      toast.error("Please select an agent");
-                      return;
-                    }
-                    if (
-                      editingRule?.assignmentType === "PERCENTAGE" &&
-                      (!editingRule?.percentage || editingRule.percentage <= 0)
-                    ) {
-                      toast.error("Please enter a valid percentage (1-100)");
-                      return;
-                    }
-                    upsertAssignmentRule.mutate({
-                      assigneeId: editingRule.assigneeId,
-                      source: editingRule.source,
-                      assignmentType: editingRule.assignmentType || "SPECIFIC",
-                      percentage: editingRule.percentage,
-                      rulePriority: editingRule.rulePriority || 0,
-                      isEnabled: true,
-                    });
-                  }}
-                  disabled={upsertAssignmentRule.isPending}
-                >
-                  {upsertAssignmentRule.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Save Rule
-                </Button>
-              </DialogFooter>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
     </PageContainer>
   );

@@ -190,7 +190,7 @@ export default function CallLogsPage() {
     <PageContainer scrollable>
       <div className="space-y-4 pb-6 sm:space-y-6">
         <div>
-          <h1 className="text-2xl font-bold sm:text-3xl">Call Logs</h1>
+          <h1 className="text-2xl font-bold sm:text-3xl">CallerDesk Logs</h1>
           <p className="text-muted-foreground mt-1.5 text-sm sm:text-base">
             View and analyze your CallerDesk call history
           </p>
@@ -247,7 +247,7 @@ export default function CallLogsPage() {
               Filters
             </CardTitle>
             <CardDescription className="text-xs sm:text-sm">
-              Filter call logs by date, type, and status
+              Filter CallerDesk logs by date, type, and status
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
@@ -364,7 +364,9 @@ export default function CallLogsPage() {
             <Card>
               <CardContent className="flex min-h-[300px] flex-col items-center justify-center p-8">
                 <Phone className="text-muted-foreground mb-4 h-12 w-12" />
-                <h3 className="text-lg font-semibold">No call logs found</h3>
+                <h3 className="text-lg font-semibold">
+                  No CallerDesk logs found
+                </h3>
                 <p className="text-muted-foreground mt-1 text-center text-sm">
                   Try adjusting your filters
                 </p>
@@ -513,7 +515,7 @@ export default function CallLogsPage() {
                   {callLogs.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="h-24 text-center">
-                        {isLoading ? "Loading..." : "No call logs found"}
+                        {isLoading ? "Loading..." : "No CallerDesk logs found"}
                       </TableCell>
                     </TableRow>
                   ) : (

@@ -55,7 +55,7 @@ export const agentNavItems: NavItem[] = [
     items: [],
   },
   {
-    title: "Call Logs",
+    title: "CallerDesk Logs",
     url: "/dashboard/call-logs",
     icon: "phoneCall",
     shortcut: ["c", "l"],
@@ -147,7 +147,7 @@ export const managerNavItems: NavItem[] = [
     items: [],
   },
   {
-    title: "Call Logs",
+    title: "CallerDesk Logs",
     url: "/dashboard/call-logs",
     icon: "phoneCall",
     shortcut: ["c", "l"],
@@ -189,10 +189,16 @@ export const managerNavItems: NavItem[] = [
         shortcut: ["u", "u"],
       },
       {
-        title: "Webhooks & Auto-Assign",
+        title: "Webhooks",
         url: "/dashboard/webhooks",
         icon: "webhook",
         shortcut: ["w", "h"],
+      },
+      {
+        title: "Auto-Assignment",
+        url: "/dashboard/auto-assign",
+        icon: "usersGroup",
+        shortcut: ["a", "a"],
       },
       {
         title: "Lead Fields",
@@ -253,7 +259,7 @@ export const adminNavItems: NavItem[] = [
     items: [],
   },
   {
-    title: "Call Logs",
+    title: "CallerDesk Logs",
     url: "/dashboard/call-logs",
     icon: "phoneCall",
     shortcut: ["c", "l"],
@@ -283,10 +289,16 @@ export const adminNavItems: NavItem[] = [
     isActive: true,
     items: [
       {
-        title: "Webhooks & Auto-Assign",
+        title: "Webhooks",
         url: "/dashboard/webhooks",
         icon: "webhook",
         shortcut: ["w", "h"],
+      },
+      {
+        title: "Auto-Assignment",
+        url: "/dashboard/auto-assign",
+        icon: "usersGroup",
+        shortcut: ["a", "a"],
       },
       {
         title: "Lead Fields",
