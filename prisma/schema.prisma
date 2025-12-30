@@ -618,6 +618,7 @@ model Campaign {
   // Relations
   members       CampaignMember[]
   leads         CampaignLead[]
+  webhookRules  WebhookAssignmentRule[] // Webhook rules that assign to this campaign
 
   @@index([workspaceId])
   @@map("campaigns")
@@ -949,10 +950,15 @@ model WebhookAssignmentRule {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   
   // Rule conditions (all optional, acts as filters)
-  source      String?  // Can be enum values (WEBSITE, FACEBOOK, etc.) or custom strings
+  source      String?  // Source that triggers this rule (WEBSITE, FACEBOOK, custom, etc.)
   status      String?  // NEW, CONTACTED, etc.
   priority    Int      @default(0) // Rule execution priority (lower = higher priority)
   
+  // Campaign Assignment (NEW: assign leads to campaigns based on source)
+  campaignId  String?  // Target campaign to add leads to
+  campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  
+  // User Assignment
   assignmentType String @default("SPECIFIC") // SPECIFIC, ROUND_ROBIN, PERCENTAGE
   percentage     Int?   // For percentage-based assignment (0-100)
   
@@ -968,5 +974,6 @@ model WebhookAssignmentRule {
 
   @@index([workspaceId])
   @@index([assigneeId])
+  @@index([campaignId])
   @@map("webhook_assignment_rules")
 }
