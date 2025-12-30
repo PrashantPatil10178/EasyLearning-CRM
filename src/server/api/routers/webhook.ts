@@ -91,6 +91,19 @@ export const webhookRouter = createTRPCRouter({
             image: true,
           },
         },
+        team: {
+          select: {
+            id: true,
+            name: true,
+            members: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
         campaign: {
           select: {
             id: true,
@@ -110,14 +123,15 @@ export const webhookRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string().optional(),
-        source: z.string().optional(), // Can be enum (WEBSITE, FACEBOOK) or custom string
-        status: z.string().optional(), // NEW, CONTACTED, etc.
-        campaignId: z.string().optional(), // Target campaign to assign leads to
+        source: z.string().nullable().optional(), // Can be enum (WEBSITE, FACEBOOK) or custom string
+        status: z.string().nullable().optional(), // NEW, CONTACTED, etc.
+        campaignId: z.string().nullable().optional(), // Target campaign to assign leads to
         assignmentType: z
-          .enum(["SPECIFIC", "ROUND_ROBIN", "PERCENTAGE"])
+          .enum(["SPECIFIC", "ROUND_ROBIN", "PERCENTAGE", "TEAM"])
           .default("SPECIFIC"),
         percentage: z.number().min(0).max(100).optional(),
-        assigneeId: z.string(),
+        assigneeId: z.string().nullable().optional(), // User ID for individual assignment
+        teamId: z.string().nullable().optional(), // Team ID for team-based assignment
         isEnabled: z.boolean().default(true),
         rulePriority: z.number().default(0),
       }),
@@ -171,4 +185,19 @@ export const webhookRouter = createTRPCRouter({
         data: { isEnabled: input.isEnabled },
       });
     }),
+
+  // Get unique lead sources from workspace
+  getUniqueSources: protectedWorkspaceProcedure.query(async ({ ctx }) => {
+    const leads = await ctx.db.lead.findMany({
+      where: {
+        workspaceId: ctx.workspaceId,
+      },
+      select: {
+        source: true,
+      },
+      distinct: ["source"],
+    });
+
+    return leads.map((lead) => lead.source).filter(Boolean) as string[];
+  }),
 });

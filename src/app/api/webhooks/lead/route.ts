@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log("[Lead Webhook] Received:", body);
 
-    // Helper function to map source to valid LeadSource enum
+    // Helper function to map source to valid LeadSource enum or keep custom source
     const mapSourceToEnum = (sourceValue: string): string => {
       const normalizedSource = sourceValue
         .toUpperCase()
@@ -124,10 +124,11 @@ export async function POST(request: NextRequest) {
         TRADE_SHOW: "EXHIBITION",
         PARTNER: "PARTNER",
         WEBHOOK: "WEBHOOK",
-        OTHER: "OTHER",
       };
 
-      return sourceMap[normalizedSource] || "OTHER";
+      // Return mapped value if found, otherwise return the original source value
+      // This allows custom sources like "Justdial", "IndiaMART", etc.
+      return sourceMap[normalizedSource] || sourceValue;
     };
 
     // Extract lead data with flexible field mapping
@@ -304,6 +305,16 @@ export async function POST(request: NextRequest) {
             name: true,
           },
         },
+        team: {
+          select: {
+            id: true,
+            members: {
+              select: {
+                id: true,
+              },
+            },
+          },
+        },
       },
       orderBy: { priority: "asc" },
     });
@@ -325,21 +336,41 @@ export async function POST(request: NextRequest) {
       const percentageRules = matchingRules.filter(
         (r) => r.assignmentType === "PERCENTAGE",
       );
+      const teamRules = matchingRules.filter(
+        (r) => r.assignmentType === "TEAM" && r.teamId,
+      );
 
-      // Priority: SPECIFIC > ROUND_ROBIN > PERCENTAGE
+      // Priority: SPECIFIC > ROUND_ROBIN > PERCENTAGE > TEAM
       if (specificRules.length > 0) {
-        assignedUserId = specificRules[0]!.assigneeId;
+        assignedUserId = specificRules[0]!.assigneeId ?? undefined;
         assignmentStrategy = "SPECIFIC";
-      } else if (roundRobinRules.length > 0) {
-        // Round Robin: Pick least recently assigned
-        const nextRule = roundRobinRules.reduce((prev, curr) =>
-          !prev.lastAssignedAt ||
-          (curr.lastAssignedAt && curr.lastAssignedAt < prev.lastAssignedAt)
-            ? curr
-            : prev,
-        );
 
-        assignedUserId = nextRule.assigneeId;
+        // Update assignment count for specific rule
+        await db.webhookAssignmentRule.update({
+          where: { id: specificRules[0]!.id },
+          data: {
+            lastAssignedAt: new Date(),
+            assignmentCount: { increment: 1 },
+          },
+        });
+      } else if (roundRobinRules.length > 0) {
+        // Round Robin: Pick agent with least assignment count for equal distribution
+        const nextRule = roundRobinRules.reduce((prev, curr) => {
+          const prevCount = prev.assignmentCount || 0;
+          const currCount = curr.assignmentCount || 0;
+
+          // If counts are equal, use lastAssignedAt as tiebreaker
+          if (prevCount === currCount) {
+            if (!prev.lastAssignedAt) return curr;
+            if (!curr.lastAssignedAt) return prev;
+            return curr.lastAssignedAt < prev.lastAssignedAt ? curr : prev;
+          }
+
+          // Pick agent with lower count
+          return currCount < prevCount ? curr : prev;
+        });
+
+        assignedUserId = nextRule.assigneeId ?? undefined;
         assignmentStrategy = "ROUND_ROBIN";
 
         await db.webhookAssignmentRule.update({
@@ -361,7 +392,7 @@ export async function POST(request: NextRequest) {
         for (const rule of percentageRules) {
           cumulative += rule.percentage || 0;
           if (random <= cumulative) {
-            assignedUserId = rule.assigneeId;
+            assignedUserId = rule.assigneeId ?? undefined;
             assignmentStrategy = "PERCENTAGE";
 
             await db.webhookAssignmentRule.update({
@@ -373,6 +404,52 @@ export async function POST(request: NextRequest) {
             });
             break;
           }
+        }
+      } else if (teamRules.length > 0) {
+        // Team: Distribute equally among team members using round robin
+        const teamRule = teamRules[0]!;
+
+        // Fetch team with members
+        const team = await db.team.findUnique({
+          where: { id: teamRule.teamId! },
+          include: {
+            members: {
+              select: { id: true },
+            },
+          },
+        });
+
+        if (team && team.members.length > 0) {
+          // Get assignment counts for all team members from leads
+          const memberCounts = await Promise.all(
+            team.members.map(async (member) => {
+              const count = await db.lead.count({
+                where: {
+                  ownerId: member.id,
+                  workspaceId: workspaceId,
+                  source: mappedSource as any,
+                },
+              });
+              return { userId: member.id, count };
+            }),
+          );
+
+          // Find member with least assignments
+          const nextMember = memberCounts.reduce((prev, curr) =>
+            curr.count < prev.count ? curr : prev,
+          );
+
+          assignedUserId = nextMember.userId;
+          assignmentStrategy = "TEAM";
+
+          // Update team rule assignment count
+          await db.webhookAssignmentRule.update({
+            where: { id: teamRule.id },
+            data: {
+              lastAssignedAt: new Date(),
+              assignmentCount: { increment: 1 },
+            },
+          });
         }
       }
 
@@ -392,7 +469,6 @@ export async function POST(request: NextRequest) {
         email: email || null,
         phone: leadPhone,
         source: mappedSource as any,
-        category: "FRESH" as any, // New leads always start in FRESH category
         status: status as any,
         priority: priority as any,
         city,
@@ -422,8 +498,6 @@ export async function POST(request: NextRequest) {
               data: {
                 campaignId: campaignId,
                 leadId: newLead.id,
-                category: "FRESH",
-                workspaceId,
               },
             })
             .catch((err) => {

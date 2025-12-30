@@ -229,12 +229,14 @@ export const leadRouter = createTRPCRouter({
         phone: z.string().optional(),
         altPhone: z.string().optional(),
         source: z.string().optional(),
+        category: z.string().optional(), // Added for manual category change
         status: z.string().optional(),
         priority: z.string().optional(),
         courseInterested: z.string().optional(),
         courseLevel: z.string().optional(),
         preferredBatch: z.string().optional(),
         budget: z.number().optional(),
+        revenue: z.number().optional(), // Added revenue field
         city: z.string().optional(),
         state: z.string().optional(),
         country: z.string().optional(),
@@ -248,7 +250,7 @@ export const leadRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { id, ...data } = input;
+      const { id, category: inputCategory, ...data } = input;
 
       // Get current lead to check for status change and workspace access
       const currentLead = await ctx.db.lead.findFirst({
@@ -291,6 +293,7 @@ export const leadRouter = createTRPCRouter({
         courseLevel: "Course Level",
         preferredBatch: "Preferred Batch",
         budget: "Budget",
+        revenue: "Revenue",
         city: "City",
         state: "State",
         country: "Country",
@@ -350,7 +353,7 @@ export const leadRouter = createTRPCRouter({
               ].includes(data.status)
             ? "ACTIVE"
             : "CLOSED"
-        : undefined;
+        : inputCategory || undefined; // Use provided category if no status change
 
       const lead = await ctx.db.lead.update({
         where: { id },

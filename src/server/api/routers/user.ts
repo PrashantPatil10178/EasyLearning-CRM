@@ -44,7 +44,13 @@ export const userRouter = createTRPCRouter({
           },
         },
         ...(role && { role: role as never }),
-        ...(teamId && { teamId }),
+        ...(teamId && {
+          teamMemberships: {
+            some: {
+              teamId: teamId,
+            },
+          },
+        }),
         ...(search && {
           OR: [{ name: { contains: search } }, { email: { contains: search } }],
         }),
@@ -62,8 +68,12 @@ export const userRouter = createTRPCRouter({
           phone: true,
           callerDeskPhone: true,
           createdAt: true,
-          team: {
-            select: { id: true, name: true },
+          teamMemberships: {
+            include: {
+              team: {
+                select: { id: true, name: true },
+              },
+            },
           },
           _count: {
             select: {

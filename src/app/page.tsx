@@ -9,15 +9,10 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { auth } from "@/server/auth";
 import { HydrateClient } from "@/trpc/server";
+import { FAQSection } from "@/components/faq-section";
 import {
   ArrowRight,
   Phone,
@@ -620,42 +615,7 @@ export default async function Home() {
             </section>
 
             {/* FAQ */}
-            <section id="faq" className="py-20">
-              <div className="container mx-auto max-w-3xl px-4 md:px-6">
-                <h2 className="mb-10 text-center text-3xl font-bold tracking-tight">
-                  Frequently Asked Questions
-                </h2>
-                <Accordion type="single" collapsible className="w-full">
-                  {[
-                    {
-                      q: "How long does setup take?",
-                      a: "You can be up and running in less than 30 minutes! Our onboarding team will help you import existing leads and configure your pipeline.",
-                    },
-                    {
-                      q: "Can I integrate with my website?",
-                      a: "Yes! We provide easy embed forms, API access, and integrations with popular website builders and landing page tools.",
-                    },
-                    {
-                      q: "Is there a mobile app?",
-                      a: "Absolutely. Our mobile app (iOS & Android) lets your team log calls, update leads, and access dashboards on the go.",
-                    },
-                    {
-                      q: "Can I import my existing leads?",
-                      a: "Yes, we support bulk import from Excel, CSV, and can even migrate data from other CRMs like Zoho, HubSpot, or spreadsheets.",
-                    },
-                  ].map((faq, i) => (
-                    <AccordionItem key={i} value={`item-${i}`}>
-                      <AccordionTrigger className="text-left">
-                        {faq.q}
-                      </AccordionTrigger>
-                      <AccordionContent className="text-muted-foreground">
-                        {faq.a}
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </div>
-            </section>
+            <FAQSection />
           </main>
 
           {/* Footer */}

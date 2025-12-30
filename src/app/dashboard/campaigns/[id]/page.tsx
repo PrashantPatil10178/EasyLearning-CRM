@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import PageContainer from "@/components/layout/page-container";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,21 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -42,9 +58,11 @@ import {
   PieChart,
   Activity,
   UserPlus,
+  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
+import { toast } from "sonner";
 
 const statusStyles: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
@@ -72,9 +90,44 @@ export default function CampaignDetailsPage() {
   const router = useRouter();
   const campaignId = params.id as string;
 
-  const { data: campaign, isLoading } = api.campaign.getById.useQuery({
+  const [teamDialogOpen, setTeamDialogOpen] = useState(false);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>("");
+
+  const {
+    data: campaign,
+    isLoading,
+    refetch,
+  } = api.campaign.getById.useQuery({
     id: campaignId,
   });
+
+  const { data: teams = [] } = api.team.getAll.useQuery();
+
+  const updateCampaignMutation = api.campaign.update.useMutation({
+    onSuccess: () => {
+      toast.success("Team assigned successfully!");
+      setTeamDialogOpen(false);
+      refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to assign team");
+    },
+  });
+
+  const handleAssignTeam = () => {
+    if (!selectedTeamId) return;
+    updateCampaignMutation.mutate({
+      id: campaignId,
+      teamId: selectedTeamId,
+    });
+  };
+
+  const handleRemoveTeam = () => {
+    updateCampaignMutation.mutate({
+      id: campaignId,
+      teamId: null,
+    });
+  };
 
   if (isLoading) {
     return (
@@ -218,6 +271,105 @@ export default function CampaignDetailsPage() {
                 </div>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Team Assignment Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5" />
+                  Assigned Team
+                </CardTitle>
+                <CardDescription>
+                  Assign this campaign to a team so members can access and work
+                  on leads
+                </CardDescription>
+              </div>
+              {campaign.team ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTeamDialogOpen(true)}
+                >
+                  Change Team
+                </Button>
+              ) : (
+                <Button size="sm" onClick={() => setTeamDialogOpen(true)}>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Assign Team
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {campaign.team ? (
+              <div className="space-y-4">
+                <div className="flex items-start justify-between rounded-lg border p-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-blue-600" />
+                      <p className="font-semibold">{campaign.team.name}</p>
+                    </div>
+                    {campaign.team.description && (
+                      <p className="text-muted-foreground text-sm">
+                        {campaign.team.description}
+                      </p>
+                    )}
+                    <p className="text-muted-foreground text-xs">
+                      {campaign.team.members?.length || 0} members
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRemoveTeam}
+                    disabled={updateCampaignMutation.isPending}
+                  >
+                    {updateCampaignMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-red-500" />
+                    )}
+                  </Button>
+                </div>
+                {campaign.team.members && campaign.team.members.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-sm font-medium">
+                      Team Members ({campaign.team.members.length})
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {campaign.team.members.map((member) => (
+                        <div
+                          key={member.id}
+                          className="bg-secondary/50 flex items-center gap-2 rounded-full border px-3 py-1"
+                        >
+                          <Avatar className="h-5 w-5">
+                            <AvatarImage src={member.user.image || undefined} />
+                            <AvatarFallback className="text-xs">
+                              {member.user.name?.charAt(0) || "?"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-sm">{member.user.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-8">
+                <ShieldCheck className="text-muted-foreground/50 mb-2 h-8 w-8" />
+                <p className="text-muted-foreground text-sm">
+                  No team assigned yet
+                </p>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  Assign a team to make this campaign visible to team members
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -565,6 +717,73 @@ export default function CampaignDetailsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Team Assignment Dialog */}
+      <Dialog open={teamDialogOpen} onOpenChange={setTeamDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Team to Campaign</DialogTitle>
+            <DialogDescription>
+              Select a team to assign to this campaign. All team members will be
+              able to see and work on the campaign leads.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Select Team</label>
+              <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a team" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teams.map((team) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        <div>
+                          <div className="font-medium">{team.name}</div>
+                          {team.description && (
+                            <div className="text-muted-foreground text-xs">
+                              {team.description}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setTeamDialogOpen(false);
+                setSelectedTeamId("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAssignTeam}
+              disabled={!selectedTeamId || updateCampaignMutation.isPending}
+            >
+              {updateCampaignMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Assigning...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Assign Team
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   );
 }

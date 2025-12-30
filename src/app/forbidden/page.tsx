@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ShieldX, Home, ArrowLeft, UserX, AlertTriangle } from "lucide-react";
@@ -70,11 +72,14 @@ export default function ForbiddenPage() {
               View My Profile
             </Link>
           </Button>
-          <Button asChild variant="ghost" size="lg" className="gap-2">
-            <Link href="javascript:history.back()">
-              <ArrowLeft className="h-4 w-4" />
-              Go Back
-            </Link>
+          <Button
+            variant="ghost"
+            size="lg"
+            className="gap-2"
+            onClick={() => window.history.back()}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Go Back
           </Button>
         </div>
 

@@ -63,14 +63,6 @@ export const agentNavItems: NavItem[] = [
     items: [],
   },
   {
-    title: "Integrations",
-    url: "/dashboard/integrations",
-    icon: "plug",
-    shortcut: ["i", "n"],
-    isActive: false,
-    items: [],
-  },
-  {
     title: "Settings",
     url: "#",
     icon: "settings",
@@ -87,18 +79,6 @@ export const agentNavItems: NavItem[] = [
         url: "/dashboard/users",
         icon: "users",
         shortcut: ["u", "u"],
-      },
-      {
-        title: "Webhook Settings",
-        url: "/dashboard/workspace-settings",
-        icon: "webhook",
-        shortcut: ["w", "h"],
-      },
-      {
-        title: "Settings",
-        shortcut: ["s", "s"],
-        url: "/dashboard/settings",
-        icon: "settings",
       },
     ],
   },

@@ -16,12 +16,16 @@ export const teamRouter = createTRPCRouter({
           select: { id: true, name: true, email: true, image: true },
         },
         members: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-            role: true,
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true,
+                role: true,
+              },
+            },
           },
         },
         _count: {
@@ -31,7 +35,11 @@ export const teamRouter = createTRPCRouter({
       orderBy: { name: "asc" },
     });
 
-    return teams;
+    // Transform the response to match the old structure
+    return teams.map((team) => ({
+      ...team,
+      members: team.members.map((m) => m.user),
+    }));
   }),
 
   // Get single team
@@ -48,18 +56,28 @@ export const teamRouter = createTRPCRouter({
             select: { id: true, name: true, email: true, image: true },
           },
           members: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-              role: true,
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  image: true,
+                  role: true,
+                },
+              },
             },
           },
         },
       });
 
-      return team;
+      if (!team) return null;
+
+      // Transform to match old structure
+      return {
+        ...team,
+        members: team.members.map((m) => m.user),
+      };
     }),
 
   // Create team
@@ -68,15 +86,18 @@ export const teamRouter = createTRPCRouter({
       z.object({
         name: z.string().min(1),
         description: z.string().optional(),
-        managerId: z.string(),
+        managerId: z.string().optional(), // Optional now
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Use provided managerId or default to current user
+      const managerId = input.managerId || ctx.session.user.id;
+
       const team = await ctx.db.team.create({
         data: {
           name: input.name,
           description: input.description,
-          managerId: input.managerId,
+          managerId: managerId,
           workspaceId: ctx.workspaceId,
         },
       });
@@ -142,9 +163,12 @@ export const teamRouter = createTRPCRouter({
         });
       }
 
-      await ctx.db.user.update({
-        where: { id: input.userId },
-        data: { teamId: input.teamId },
+      // Create team membership (many-to-many)
+      await ctx.db.teamMember.create({
+        data: {
+          teamId: input.teamId,
+          userId: input.userId,
+        },
       });
 
       return { success: true };
@@ -155,31 +179,36 @@ export const teamRouter = createTRPCRouter({
     .input(
       z.object({
         userId: z.string(),
+        teamId: z.string(), // Now we need to specify which team to remove from
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const user = await ctx.db.user.findUnique({
-        where: { id: input.userId },
-        include: { team: true },
+      const membership = await ctx.db.teamMember.findFirst({
+        where: {
+          userId: input.userId,
+          teamId: input.teamId,
+        },
+        include: {
+          team: true,
+        },
       });
 
-      if (!user || !user.teamId) {
+      if (!membership) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "User not found or not in a team",
+          message: "User not found in this team",
         });
       }
 
-      if (user.team?.workspaceId !== ctx.workspaceId) {
+      if (membership.team.workspaceId !== ctx.workspaceId) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "You cannot manage users from other workspaces",
         });
       }
 
-      await ctx.db.user.update({
-        where: { id: input.userId },
-        data: { teamId: null },
+      await ctx.db.teamMember.delete({
+        where: { id: membership.id },
       });
 
       return { success: true };
@@ -207,24 +236,32 @@ export const teamRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  // Get my team
-  getMyTeam: protectedWorkspaceProcedure.query(async ({ ctx }) => {
-    const user = await ctx.db.user.findUnique({
-      where: { id: ctx.session.user.id },
+  // Get my teams (now returns array since user can be in multiple teams)
+  getMyTeams: protectedWorkspaceProcedure.query(async ({ ctx }) => {
+    const memberships = await ctx.db.teamMember.findMany({
+      where: {
+        userId: ctx.session.user.id,
+        team: {
+          workspaceId: ctx.workspaceId,
+        },
+      },
       include: {
         team: {
-          where: { workspaceId: ctx.workspaceId },
           include: {
             manager: {
               select: { id: true, name: true, email: true, image: true },
             },
             members: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                image: true,
-                role: true,
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    image: true,
+                    role: true,
+                  },
+                },
               },
             },
           },
@@ -232,6 +269,9 @@ export const teamRouter = createTRPCRouter({
       },
     });
 
-    return user?.team ?? null;
+    return memberships.map((m) => ({
+      ...m.team,
+      members: m.team.members.map((tm) => tm.user),
+    }));
   }),
 });
