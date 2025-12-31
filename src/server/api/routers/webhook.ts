@@ -96,10 +96,15 @@ export const webhookRouter = createTRPCRouter({
             id: true,
             name: true,
             members: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    image: true,
+                  },
+                },
               },
             },
           },

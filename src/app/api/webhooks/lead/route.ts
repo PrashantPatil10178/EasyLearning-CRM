@@ -414,7 +414,7 @@ export async function POST(request: NextRequest) {
           where: { id: teamRule.teamId! },
           include: {
             members: {
-              select: { id: true },
+              select: { userId: true },
             },
           },
         });
@@ -425,12 +425,12 @@ export async function POST(request: NextRequest) {
             team.members.map(async (member) => {
               const count = await db.lead.count({
                 where: {
-                  ownerId: member.id,
+                  ownerId: member.userId,
                   workspaceId: workspaceId,
                   source: mappedSource as any,
                 },
               });
-              return { userId: member.id, count };
+              return { userId: member.userId, count };
             }),
           );
 
