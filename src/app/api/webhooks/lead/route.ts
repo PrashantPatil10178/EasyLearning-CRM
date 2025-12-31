@@ -342,7 +342,7 @@ export async function POST(request: NextRequest) {
 
       // Priority: SPECIFIC > ROUND_ROBIN > PERCENTAGE > TEAM
       if (specificRules.length > 0) {
-        assignedUserId = specificRules[0]!.assigneeId ?? undefined;
+        assignedUserId = specificRules[0]!.assigneeId;
         assignmentStrategy = "SPECIFIC";
 
         // Update assignment count for specific rule
@@ -370,7 +370,7 @@ export async function POST(request: NextRequest) {
           return currCount < prevCount ? curr : prev;
         });
 
-        assignedUserId = nextRule.assigneeId ?? undefined;
+        assignedUserId = nextRule.assigneeId;
         assignmentStrategy = "ROUND_ROBIN";
 
         await db.webhookAssignmentRule.update({
@@ -392,7 +392,7 @@ export async function POST(request: NextRequest) {
         for (const rule of percentageRules) {
           cumulative += rule.percentage || 0;
           if (random <= cumulative) {
-            assignedUserId = rule.assigneeId ?? undefined;
+            assignedUserId = rule.assigneeId;
             assignmentStrategy = "PERCENTAGE";
 
             await db.webhookAssignmentRule.update({

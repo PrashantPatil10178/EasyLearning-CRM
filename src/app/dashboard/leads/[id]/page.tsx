@@ -1063,6 +1063,17 @@ export default function LeadDetailPage() {
                     </div>
                   </div>
                 )}
+                {lead.company && (
+                  <div className="flex items-start gap-3">
+                    <Building className="text-muted-foreground mt-0.5 h-4 w-4" />
+                    <div className="flex flex-col">
+                      <span className="font-medium">{lead.company}</span>
+                      <span className="text-muted-foreground text-xs">
+                        Company
+                      </span>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

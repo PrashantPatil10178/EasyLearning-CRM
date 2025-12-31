@@ -73,9 +73,8 @@ model User {
   workspaces       WorkspaceMember[]
   webhookAssignmentRules WebhookAssignmentRule[]
 
-  // Team Relations
-  teamId           String?
-  team             Team?            @relation("TeamMembers", fields: [teamId], references: [id])
+  // Team Relations (Many-to-Many)
+  teamMemberships  TeamMember[]
   managedTeams     Team[]           @relation("TeamManager")
 
   @@map("users")
@@ -226,16 +225,34 @@ model Team {
   description String?
   managerId   String
   manager     User     @relation("TeamManager", fields: [managerId], references: [id])
-  members     User[]   @relation("TeamMembers")
+  members     TeamMember[] // Many-to-many relation via join table
+  campaigns   Campaign[]   // Campaigns assigned to this team
   
   workspaceId String?
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  webhookAssignmentRules WebhookAssignmentRule[] // Webhook rules that assign to this team
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([workspaceId])
   @@map("teams")
+}
+
+// Join table for many-to-many relationship between Users and Teams
+model TeamMember {
+  id        String   @id @default(cuid())
+  userId    String
+  teamId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, teamId])
+  @@index([userId])
+  @@index([teamId])
+  @@map("team_members")
 }
 
 // ============================================
@@ -253,7 +270,7 @@ model Lead {
   altPhone    String?
   
   // Lead Details
-  source      LeadSource      @default(WEBSITE)
+  source      String          @default("WEBSITE")  // Allows custom sources
   category    LeadCategory    @default(FRESH)
   status      LeadStatus      @default(NEW_LEAD)
   priority    Priority        @default(MEDIUM)
@@ -326,23 +343,6 @@ model Lead {
   @@index([email])
   @@index([workspaceId])
   @@map("leads")
-}
-
-enum LeadSource {
-  WEBSITE
-  FACEBOOK
-  INSTAGRAM
-  GOOGLE_ADS
-  LINKEDIN
-  REFERRAL
-  WALK_IN
-  PHONE_INQUIRY
-  WHATSAPP
-  EMAIL_CAMPAIGN
-  EXHIBITION
-  PARTNER
-  WEBHOOK
-  OTHER
 }
 
 enum LeadCategory {
@@ -586,12 +586,18 @@ model Campaign {
   name          String
   description   String?
   type          CampaignType   @default(EMAIL)
-  status        CampaignStatus @default(DRAFT)
+  status        CampaignStatus @default(ACTIVE)
   
-  // Target
+  // Filter Settings
+  timelineFilter String?       // "30_DAYS", "60_DAYS", "90_DAYS", "CUSTOM"
+  customStartDate DateTime?    // For custom timeline
+  customEndDate  DateTime?     // For custom timeline
+  sourceFilter   String?       // Lead source filter (e.g., "WEBSITE", "FACEBOOK", etc.)
+  
+  // Target (deprecated - keeping for backward compatibility)
   targetAudience String?       // JSON criteria
   
-  // Schedule
+  // Schedule (deprecated - use filter dates instead)
   startDate     DateTime?
   endDate       DateTime?
   
@@ -615,12 +621,17 @@ model Campaign {
   workspaceId   String?
   workspace     Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
+  // Team Assignment
+  teamId        String?
+  team          Team?          @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
   // Relations
   members       CampaignMember[]
   leads         CampaignLead[]
   webhookRules  WebhookAssignmentRule[] // Webhook rules that assign to this campaign
 
   @@index([workspaceId])
+  @@index([teamId])
   @@map("campaigns")
 }
 
@@ -958,12 +969,15 @@ model WebhookAssignmentRule {
   campaignId  String?  // Target campaign to add leads to
   campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   
-  // User Assignment
-  assignmentType String @default("SPECIFIC") // SPECIFIC, ROUND_ROBIN, PERCENTAGE
+  // User/Team Assignment
+  assignmentType String @default("SPECIFIC") // SPECIFIC, ROUND_ROBIN, PERCENTAGE, TEAM
   percentage     Int?   // For percentage-based assignment (0-100)
   
-  assigneeId  String
-  assignee    User     @relation(fields: [assigneeId], references: [id], onDelete: Cascade)
+  assigneeId  String?  // Individual user assignment (null if team-based)
+  assignee    User?     @relation(fields: [assigneeId], references: [id], onDelete: Cascade)
+  
+  teamId      String?  // Team assignment (null if user-based)
+  team        Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
   
   lastAssignedAt DateTime?
   assignmentCount Int @default(0)
@@ -975,5 +989,6 @@ model WebhookAssignmentRule {
   @@index([workspaceId])
   @@index([assigneeId])
   @@index([campaignId])
+  @@index([teamId])
   @@map("webhook_assignment_rules")
 }
