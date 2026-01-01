@@ -153,6 +153,7 @@ export const campaignRouter = createTRPCRouter({
                   courseInterested: true,
                   source: true,
                   createdAt: true,
+                  updatedAt: true,
                   revenue: true,
                   ownerId: true,
                   owner: {
