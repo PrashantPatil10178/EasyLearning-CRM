@@ -240,7 +240,7 @@ export async function POST(request: NextRequest) {
           leadId: updatedLead.id,
           type: "SYSTEM",
           subject: "Lead Updated via Webhook",
-          message: `Lead information updated from ${source}`,
+          message: `Lead information updated from ${source}\n\nReceived Data:\n${JSON.stringify(body, null, 2)}`,
           workspaceId,
         },
       });
@@ -521,7 +521,7 @@ export async function POST(request: NextRequest) {
         leadId: newLead.id,
         type: "SYSTEM",
         subject: "Lead Created via Webhook",
-        message: `New lead received from ${mappedSource} (original: ${source})${notes ? `: ${notes}` : ""}${assignedUserId ? ` (Auto-assigned via ${assignmentStrategy})` : ""}${assignedCampaignIds.length > 0 ? ` (Added to ${assignedCampaignIds.length} campaign(s))` : ""}`,
+        message: `New lead received from ${mappedSource} (original: ${source})${notes ? `: ${notes}` : ""}${assignedUserId ? ` (Auto-assigned via ${assignmentStrategy})` : ""}${assignedCampaignIds.length > 0 ? ` (Added to ${assignedCampaignIds.length} campaign(s))` : ""}\n\nReceived Data:\n${JSON.stringify(body, null, 2)}`,
         workspaceId,
       },
     });

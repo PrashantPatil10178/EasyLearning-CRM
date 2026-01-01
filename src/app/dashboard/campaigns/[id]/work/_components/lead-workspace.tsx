@@ -37,10 +37,83 @@ import {
   Save,
   X,
   Target,
+  Code,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { LEAD_STATUS_HIERARCHY } from "@/lib/lead-status";
+
+const renderActivityMessage = (message: string | null | undefined) => {
+  if (!message) return null;
+
+  // Check if message contains "Received Data:" marker
+  const parts = message.split("Received Data:");
+
+  // If no marker found, just return the message as is
+  if (parts.length < 2) {
+    return (
+      <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap">
+        {message}
+      </p>
+    );
+  }
+
+  const mainMessage = parts[0].trim();
+  const jsonString = parts.slice(1).join("Received Data:").trim();
+
+  let jsonData = null;
+  try {
+    jsonData = JSON.parse(jsonString);
+  } catch (e) {
+    // If parsing fails, return original message
+    return (
+      <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap">
+        {message}
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {mainMessage && (
+        <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap">
+          {mainMessage}
+        </p>
+      )}
+
+      {jsonData && typeof jsonData === "object" && (
+        <div className="bg-card/50 overflow-hidden rounded-md border text-xs">
+          <div className="bg-muted/50 flex items-center gap-2 border-b px-3 py-2">
+            <Code className="text-muted-foreground h-3.5 w-3.5" />
+            <span className="text-muted-foreground font-medium">
+              Webhook Data Payload
+            </span>
+          </div>
+          <div className="grid gap-y-2 p-3">
+            {Object.entries(jsonData).map(([key, value]) => (
+              <div
+                key={key}
+                className="grid grid-cols-[120px_1fr] items-start gap-2"
+              >
+                <span
+                  className="text-muted-foreground truncate font-medium"
+                  title={key}
+                >
+                  {key}
+                </span>
+                <span className="text-foreground bg-muted/30 rounded px-1.5 py-0.5 font-mono break-all">
+                  {typeof value === "object"
+                    ? JSON.stringify(value)
+                    : String(value)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 type ViewMode = "list" | "details";
 
@@ -771,10 +844,10 @@ export function LeadWorkspace({
                                     {activity.subject}
                                   </p>
                                 )}
-                                <p className="text-muted-foreground text-sm leading-relaxed">
-                                  {(activity as any).message ||
-                                    activity.description}
-                                </p>
+                                {renderActivityMessage(
+                                  (activity as any).message ||
+                                    activity.description,
+                                )}
                               </div>
                             </div>
                           </div>

@@ -246,7 +246,7 @@ export default function LeadsPage() {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex-1">
                   <p className="text-muted-foreground text-xs font-medium sm:text-sm">
-                    Contacted
+                    Worked
                   </p>
                   <p className="mt-1 text-xl font-bold sm:text-2xl">
                     {stats?.contacted || 0}
@@ -263,7 +263,7 @@ export default function LeadsPage() {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex-1">
                   <p className="text-muted-foreground text-xs font-medium sm:text-sm">
-                    Qualified
+                    Intrested
                   </p>
                   <p className="mt-1 text-xl font-bold sm:text-2xl">
                     {stats?.qualified || 0}
