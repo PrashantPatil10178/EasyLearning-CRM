@@ -72,7 +72,10 @@ export default function AppSidebar() {
   const { data: session } = useSession();
   const router = useRouter();
 
-  const { data: workspaces, isLoading } = api.workspace.getAll.useQuery();
+  const { data: workspaces, isLoading } = api.workspace.getAll.useQuery(
+    undefined,
+    { enabled: !!session?.user },
+  );
 
   // Check if AISensy integration is active
   const { data: aisensyIntegration } = api.integration.get.useQuery(

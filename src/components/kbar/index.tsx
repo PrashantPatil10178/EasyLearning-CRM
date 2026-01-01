@@ -13,9 +13,11 @@ import RenderResults from "./render-result";
 import useThemeSwitching from "./use-theme-switching";
 import { api } from "@/trpc/react";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useSession } from "next-auth/react";
 
 export default function KBar({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const { data: session } = useSession();
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedQuery = useDebounce(searchQuery, 300);
 
@@ -23,7 +25,7 @@ export default function KBar({ children }: { children: React.ReactNode }) {
   const { data: searchResults } = api.search.globalSearch.useQuery(
     { query: debouncedQuery, limit: 20 },
     {
-      enabled: debouncedQuery.length >= 2,
+      enabled: debouncedQuery.length >= 2 && !!session?.user,
       staleTime: 30000, // Cache for 30 seconds
     },
   );
@@ -32,6 +34,7 @@ export default function KBar({ children }: { children: React.ReactNode }) {
   const { data: recentLeads } = api.search.getRecentLeads.useQuery(
     { limit: 5 },
     {
+      enabled: !!session?.user,
       staleTime: 60000, // Cache for 1 minute
     },
   );

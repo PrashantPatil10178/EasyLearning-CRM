@@ -105,13 +105,16 @@ export default function CampaignWorkPage() {
   const filteredLeads = useMemo(() => {
     if (!campaign?.leads) return [];
 
-    return campaign.leads.filter((cl) => {
+    const filtered = campaign.leads.filter((cl) => {
       if (leadType === "NEW") {
         return cl.lead.category === "FRESH";
       } else {
         return cl.lead.category === "ACTIVE";
       }
     });
+
+    // Reverse the order so most recent/updated leads appear first
+    return [...filtered].reverse();
   }, [campaign?.leads, leadType]);
 
   const selectedLead = useMemo(() => {
