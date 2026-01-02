@@ -63,7 +63,7 @@ import {
 import Link from "next/link";
 import { LeadFormDialog } from "@/components/leads/lead-form-dialog";
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
-import { ImportLeadsDialog } from "@/components/leads/import-leads-dialog";
+import { ImportLeadsWizard } from "@/components/leads/import-leads-wizard";
 import { LeadStatusUpdateDialog } from "@/components/leads/lead-status-update-dialog";
 import { toast } from "sonner";
 import {
@@ -200,7 +200,7 @@ export default function LeadsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <ImportLeadsDialog />
+            <ImportLeadsWizard />
             <LeadFormDialog />
           </div>
         </div>

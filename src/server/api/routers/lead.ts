@@ -617,9 +617,14 @@ export const leadRouter = createTRPCRouter({
               email: lead.email || null,
               phone: lead.phone,
               altPhone: lead.altPhone || null,
-              source: (lead.source || "OTHER") as never,
-              status: (lead.status || "NEW") as never,
-              priority: (lead.priority || "MEDIUM") as never,
+              source: (lead.source?.toUpperCase().replace(/\s+/g, "_") ||
+                "OTHER") as never,
+              status: (lead.status?.toUpperCase().replace(/\s+/g, "_") === "NEW"
+                ? "NEW_LEAD"
+                : lead.status?.toUpperCase().replace(/\s+/g, "_") ||
+                  "NEW_LEAD") as never,
+              priority: (lead.priority?.toUpperCase().replace(/\s+/g, "_") ||
+                "MEDIUM") as never,
               courseInterested: lead.courseInterested || null,
               city: lead.city || null,
               state: lead.state || null,
