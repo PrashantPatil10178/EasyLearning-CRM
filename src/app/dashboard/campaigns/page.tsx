@@ -22,6 +22,7 @@ import {
   Target,
   CalendarIcon,
   MoreVertical,
+  UserPlus,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -34,6 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AddLeadsForm } from "./_components/add-leads-form";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,6 +65,9 @@ export default function CampaignsPage() {
   const [search, setSearch] = useState("");
   const [editingCampaign, setEditingCampaign] = useState<any>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [addLeadsCampaignId, setAddLeadsCampaignId] = useState<string | null>(
+    null,
+  );
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"all" | "myteams">("all");
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
@@ -277,6 +282,12 @@ export default function CampaignsPage() {
                         <DropdownMenuItem onClick={() => handleEdit(campaign)}>
                           <Edit className="mr-2 h-4 w-4" />
                           Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setAddLeadsCampaignId(campaign.id)}
+                        >
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Add Leads
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleAssignTeam(campaign)}
@@ -687,6 +698,31 @@ export default function CampaignsPage() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Leads Dialog */}
+      <Dialog
+        open={!!addLeadsCampaignId}
+        onOpenChange={(open) => !open && setAddLeadsCampaignId(null)}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add Leads by Source</DialogTitle>
+            <DialogDescription>
+              Add all leads from a specific source to this campaign.
+            </DialogDescription>
+          </DialogHeader>
+          {addLeadsCampaignId && (
+            <AddLeadsForm
+              campaignId={addLeadsCampaignId}
+              onSuccess={() => {
+                setAddLeadsCampaignId(null);
+                refetch();
+              }}
+              onCancel={() => setAddLeadsCampaignId(null)}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </PageContainer>

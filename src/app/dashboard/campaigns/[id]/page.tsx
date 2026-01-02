@@ -63,6 +63,7 @@ import {
 import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { AddLeadsBySourceDialog } from "../_components/add-leads-by-source-dialog";
 
 const statusStyles: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
@@ -209,12 +210,18 @@ export default function CampaignDetailsPage() {
               )}
             </div>
           </div>
-          <Button asChild>
-            <Link href={`/dashboard/campaigns/${campaignId}/edit`}>
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Campaign
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <AddLeadsBySourceDialog
+              campaignId={campaignId}
+              onSuccess={refetch}
+            />
+            <Button asChild>
+              <Link href={`/dashboard/campaigns/${campaignId}/edit`}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Campaign
+              </Link>
+            </Button>
+          </div>
         </div>
 
         {/* Campaign Info Card */}

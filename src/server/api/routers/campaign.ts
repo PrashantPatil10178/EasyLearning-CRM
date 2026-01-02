@@ -331,6 +331,63 @@ export const campaignRouter = createTRPCRouter({
       return { success: true, added: addedCount };
     }),
 
+  addLeadsFromSource: protectedWorkspaceProcedure
+    .input(
+      z.object({
+        campaignId: z.string(),
+        source: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { campaignId, source } = input;
+
+      const campaign = await ctx.db.campaign.findFirst({
+        where: {
+          id: campaignId,
+          workspaceId: ctx.workspaceId,
+        },
+      });
+
+      if (!campaign) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Campaign not found or you don't have access",
+        });
+      }
+
+      const leads = await ctx.db.lead.findMany({
+        where: {
+          source: source,
+          workspaceId: ctx.workspaceId,
+        },
+        select: { id: true },
+      });
+
+      if (leads.length === 0) {
+        return { success: true, added: 0 };
+      }
+
+      const result = await ctx.db.campaignLead.createMany({
+        data: leads.map((lead) => ({
+          campaignId,
+          leadId: lead.id,
+        })),
+        skipDuplicates: true,
+      });
+
+      // Update campaign lead count
+      const totalLeads = await ctx.db.campaignLead.count({
+        where: { campaignId },
+      });
+
+      await ctx.db.campaign.update({
+        where: { id: campaignId },
+        data: { totalLeads },
+      });
+
+      return { success: true, added: result.count };
+    }),
+
   // Remove lead from campaign
   removeLead: protectedWorkspaceProcedure
     .input(
