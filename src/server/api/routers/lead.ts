@@ -596,15 +596,28 @@ export const leadRouter = createTRPCRouter({
       const { leads, assignToMe, autoAssign } = input;
       const userId = ctx.session.user.id;
 
+      // Fetch all valid user IDs in the workspace to validate ownerId
+      const workspaceUsers = await ctx.db.user.findMany({
+        where: {
+          workspaces: {
+            some: {
+              workspaceId: ctx.workspaceId,
+            },
+          },
+        },
+        select: { id: true },
+      });
+      const validUserIds = new Set(workspaceUsers.map((u) => u.id));
+
       const createdLeads = await Promise.all(
         leads.map((lead) => {
           // Determine the owner ID
           let ownerId = null;
 
-          // Priority: 1. lead.ownerId (from CSV "Assign To" column)
+          // Priority: 1. lead.ownerId (from CSV "Assign To" column) - MUST be valid
           //           2. assignToMe flag
           //           3. autoAssign flag (future feature)
-          if (lead.ownerId) {
+          if (lead.ownerId && validUserIds.has(lead.ownerId)) {
             ownerId = lead.ownerId;
           } else if (assignToMe) {
             ownerId = userId;
