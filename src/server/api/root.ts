@@ -15,6 +15,7 @@ import { whatsappRouter } from "@/server/api/routers/whatsapp";
 import { settingsRouter } from "@/server/api/routers/settings";
 import { searchRouter } from "@/server/api/routers/search";
 import { webhookRouter } from "@/server/api/routers/webhook";
+import { reportsRouter } from "@/server/api/routers/reports";
 import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
 
 /**
@@ -40,6 +41,7 @@ export const appRouter = createTRPCRouter({
   settings: settingsRouter,
   search: searchRouter,
   webhook: webhookRouter,
+  reports: reportsRouter,
 });
 
 // export type definition of API

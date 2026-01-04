@@ -47,6 +47,9 @@ export const dashboardRouter = createTRPCRouter({
 
       // Converted leads this month
       convertedLeadsThisMonth,
+
+      // Active campaigns
+      activeCampaigns,
     ] = await Promise.all([
       ctx.db.lead.count({ where: ownedFilter }),
       ctx.db.lead.count({
@@ -93,6 +96,14 @@ export const dashboardRouter = createTRPCRouter({
           convertedAt: { gte: thisMonth },
         },
       }),
+
+      // Total Campaigns (Active)
+      ctx.db.campaign.count({
+        where: {
+          workspaceId,
+          status: "ACTIVE",
+        },
+      }),
     ]);
 
     return {
@@ -102,6 +113,9 @@ export const dashboardRouter = createTRPCRouter({
         newThisMonth: newLeadsThisMonth,
         followUpsToday,
         convertedThisMonth: convertedLeadsThisMonth,
+      },
+      campaigns: {
+        active: activeCampaigns,
       },
       tasks: {
         pending: pendingTasks,
