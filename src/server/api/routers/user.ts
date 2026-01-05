@@ -14,8 +14,12 @@ export const userRouter = createTRPCRouter({
     const user = await ctx.db.user.findUnique({
       where: { id: ctx.session.user.id },
       include: {
-        team: {
-          select: { id: true, name: true },
+        teamMemberships: {
+          include: {
+            team: {
+              select: { id: true, name: true },
+            },
+          },
         },
       },
     });
@@ -125,8 +129,12 @@ export const userRouter = createTRPCRouter({
           },
         },
         include: {
-          team: {
-            select: { id: true, name: true },
+          teamMemberships: {
+            include: {
+              team: {
+                select: { id: true, name: true },
+              },
+            },
           },
           _count: {
             select: {
@@ -329,7 +337,6 @@ export const userRouter = createTRPCRouter({
 
       const updateData: any = {};
 
-      // Update email if provided
       if (input.email) {
         // Check if email is already taken by another user
         const existingUser = await ctx.db.user.findUnique({

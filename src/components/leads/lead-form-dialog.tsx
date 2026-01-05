@@ -7,7 +7,8 @@ import * as z from "zod";
 import { api } from "@/trpc/react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { LEAD_STATUS_HIERARCHY, statusDisplayNames } from "@/lib/lead-status";
+import { statusDisplayNames } from "@/lib/lead-status";
+import { useLeadStatuses } from "@/hooks/use-lead-statuses";
 import {
   Dialog,
   DialogContent,
@@ -56,6 +57,13 @@ export function LeadFormDialog() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const utils = api.useUtils();
+
+  // Fetch custom lead statuses
+  const {
+    categories: statusCategories,
+    isLoading: isLoadingStatuses,
+    allStatuses,
+  } = useLeadStatuses();
 
   // Fetch custom fields
   const { data: customFields, isLoading: isLoadingFields } =
@@ -310,6 +318,7 @@ export function LeadFormDialog() {
                       <Select
                         onValueChange={field.onChange}
                         defaultValue={field.value}
+                        disabled={isLoadingStatuses}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -317,14 +326,14 @@ export function LeadFormDialog() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {LEAD_STATUS_HIERARCHY.map((category) => (
+                          {statusCategories.map((category) => (
                             <div key={category.value}>
                               <div className="text-muted-foreground px-2 py-1.5 text-sm font-semibold">
                                 {category.label}
                               </div>
                               {category.statuses.map((status) => (
                                 <SelectItem
-                                  key={status.value}
+                                  key={status.id}
                                   value={status.value}
                                 >
                                   {status.label}

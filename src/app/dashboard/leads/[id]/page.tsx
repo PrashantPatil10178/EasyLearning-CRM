@@ -77,16 +77,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  LEAD_STATUS_HIERARCHY,
-  statusStyles,
-  statusDisplayNames,
-} from "@/lib/lead-status";
+import { statusStyles, statusDisplayNames } from "@/lib/lead-status";
+import { useLeadStatuses } from "@/hooks/use-lead-statuses";
 
 export default function LeadDetailPage() {
   const params = useParams();
   const router = useRouter();
   const leadId = params.id as string;
+
+  // Fetch custom lead statuses
+  const { categories: statusCategories, isLoading: isLoadingStatuses } =
+    useLeadStatuses();
 
   const [note, setNote] = useState("");
   const [taskNote, setTaskNote] = useState("");
@@ -899,18 +900,19 @@ export default function LeadDetailPage() {
                     setSelectedStatus(value);
                     handleStatusUpdate(value);
                   }}
+                  disabled={isLoadingStatuses}
                 >
                   <SelectTrigger className="focus:ring-primary/20 transition-all focus:ring-2">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {LEAD_STATUS_HIERARCHY.map((category) => (
+                    {statusCategories.map((category) => (
                       <div key={category.value}>
                         <div className="text-muted-foreground px-2 py-1.5 text-sm font-semibold">
                           {category.label}
                         </div>
                         {category.statuses.map((status) => (
-                          <SelectItem key={status.value} value={status.value}>
+                          <SelectItem key={status.id} value={status.value}>
                             {status.label}
                           </SelectItem>
                         ))}

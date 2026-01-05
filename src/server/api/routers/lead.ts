@@ -789,20 +789,23 @@ export const leadRouter = createTRPCRouter({
         });
       }
 
-      // Calculate category based on new status
-      const category =
-        input.status === "NEW_LEAD"
+      // Get the status config to determine the correct category
+      const statusConfig = await ctx.db.leadStatusConfig.findFirst({
+        where: {
+          workspaceId: ctx.workspaceId,
+          name: input.status,
+          isDeleted: false,
+        },
+      });
+
+      // Calculate category based on status stage
+      const category = statusConfig
+        ? statusConfig.stage === "INITIAL"
           ? "FRESH"
-          : [
-                "INTERESTED",
-                "JUST_CURIOUS",
-                "FOLLOW_UP",
-                "CONTACTED",
-                "QUALIFIED",
-                "NEGOTIATION",
-              ].includes(input.status)
+          : statusConfig.stage === "ACTIVE"
             ? "ACTIVE"
-            : "CLOSED";
+            : "CLOSED"
+        : "ACTIVE"; // Default to ACTIVE if status not found
 
       const lead = await ctx.db.lead.update({
         where: { id: input.id },

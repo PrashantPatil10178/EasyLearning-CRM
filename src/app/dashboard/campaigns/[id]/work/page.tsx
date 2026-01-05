@@ -77,6 +77,25 @@ export default function CampaignWorkPage() {
     return filteredLeads.slice(0, visibleLeadsCount);
   }, [filteredLeads, visibleLeadsCount]);
 
+  // Calculate lead counts by category
+  const newLeadsCount = useMemo(() => {
+    return (
+      campaign?.leads?.filter((cl) => cl.lead.category === "FRESH").length || 0
+    );
+  }, [campaign?.leads]);
+
+  const activeLeadsCount = useMemo(() => {
+    return (
+      campaign?.leads?.filter((cl) => cl.lead.category === "ACTIVE").length || 0
+    );
+  }, [campaign?.leads]);
+
+  const closedLeadsCount = useMemo(() => {
+    return (
+      campaign?.leads?.filter((cl) => cl.lead.category === "CLOSED").length || 0
+    );
+  }, [campaign?.leads]);
+
   // Reset visible count when lead type changes
   useEffect(() => {
     setVisibleLeadsCount(20);
@@ -269,13 +288,6 @@ export default function CampaignWorkPage() {
       </div>
     );
   }
-
-  const newLeadsCount = campaign.leads.filter(
-    (cl) => cl.lead.category === "FRESH",
-  ).length;
-  const activeLeadsCount = campaign.leads.filter(
-    (cl) => cl.lead.category === "ACTIVE",
-  ).length;
 
   const handleStatusUpdate = (status: string) => {
     if (!selectedLeadId) return;
@@ -480,6 +492,7 @@ export default function CampaignWorkPage() {
               setLeftPanelOpen={setLeftPanelOpen}
               newLeadsCount={newLeadsCount}
               activeLeadsCount={activeLeadsCount}
+              closedLeadsCount={closedLeadsCount}
             />
 
             {/* MIDDLE + RIGHT PANEL */}

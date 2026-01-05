@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { LEAD_STATUS_HIERARCHY } from "@/lib/lead-status";
+import { useLeadStatuses } from "@/hooks/use-lead-statuses";
 
 const renderActivityMessage = (message: string | null | undefined) => {
   if (!message) return null;
@@ -188,6 +188,10 @@ export function LeadWorkspace({
   handleAddNote,
   createNoteMutation,
 }: LeadWorkspaceProps) {
+  // Fetch custom lead statuses
+  const { categories: statusCategories, isLoading: isLoadingStatuses } =
+    useLeadStatuses();
+
   return (
     <div
       className={cn(
@@ -330,18 +334,19 @@ export function LeadWorkspace({
                 <Select
                   value={selectedLead.status}
                   onValueChange={handleStatusUpdate}
+                  disabled={isLoadingStatuses}
                 >
                   <SelectTrigger className="mt-1 h-8">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {LEAD_STATUS_HIERARCHY.map((category) => (
+                    {statusCategories.map((category) => (
                       <div key={category.value}>
                         <div className="text-muted-foreground px-2 py-1.5 text-sm font-semibold">
                           {category.label}
                         </div>
                         {category.statuses.map((status) => (
-                          <SelectItem key={status.value} value={status.value}>
+                          <SelectItem key={status.id} value={status.value}>
                             {status.label}
                           </SelectItem>
                         ))}

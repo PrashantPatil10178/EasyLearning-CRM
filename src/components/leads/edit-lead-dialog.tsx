@@ -7,7 +7,7 @@ import * as z from "zod";
 import { api } from "@/trpc/react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { LEAD_STATUS_HIERARCHY } from "@/lib/lead-status";
+import { useLeadStatuses } from "@/hooks/use-lead-statuses";
 import {
   Dialog,
   DialogContent,
@@ -64,6 +64,10 @@ export function EditLeadDialog({
 }: EditLeadDialogProps) {
   const router = useRouter();
   const utils = api.useUtils();
+
+  // Fetch custom lead statuses
+  const { categories: statusCategories, isLoading: isLoadingStatuses } =
+    useLeadStatuses();
 
   // Fetch custom fields
   const { data: customFields, isLoading: isLoadingFields } =
@@ -320,6 +324,7 @@ export function EditLeadDialog({
                       <Select
                         onValueChange={field.onChange}
                         defaultValue={field.value}
+                        disabled={isLoadingStatuses}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -327,14 +332,14 @@ export function EditLeadDialog({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {LEAD_STATUS_HIERARCHY.map((category) => (
+                          {statusCategories.map((category) => (
                             <div key={category.value}>
                               <div className="text-muted-foreground px-2 py-1.5 text-sm font-semibold">
                                 {category.label}
                               </div>
                               {category.statuses.map((status) => (
                                 <SelectItem
-                                  key={status.value}
+                                  key={status.id}
                                   value={status.value}
                                 >
                                   {status.label}

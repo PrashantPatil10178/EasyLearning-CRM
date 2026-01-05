@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Phone, Star, Loader2, Target, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { statusStyles, statusDisplayNames } from "@/lib/lead-status";
+import { useLeadStatuses } from "@/hooks/use-lead-statuses";
 
 type LeadType = "NEW" | "ACTIVE";
 type ViewMode = "list" | "details";
@@ -31,6 +31,15 @@ export function LeadList({
   selectedLeadId,
   handleLeadClick,
 }: LeadListProps) {
+  // Fetch custom lead statuses to get colors
+  const { allStatuses } = useLeadStatuses();
+
+  // Helper to get status color
+  const getStatusColor = (statusName: string) => {
+    const status = allStatuses.find((s) => s.value === statusName);
+    return status?.color || "#6B7280"; // Default gray if not found
+  };
+
   return (
     <div
       className={cn(
@@ -65,12 +74,12 @@ export function LeadList({
                       : "border border-transparent",
                   )}
                 >
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       {/* Agent Name */}
                       {cl.lead.owner && (
                         <div className="mb-1 flex items-center gap-1.5">
-                          <Avatar className="h-4 w-4">
+                          <Avatar className="h-4 w-4 flex-shrink-0">
                             <AvatarImage
                               src={cl.lead.owner.image || undefined}
                             />
@@ -78,44 +87,41 @@ export function LeadList({
                               {cl.lead.owner.name?.charAt(0) || "?"}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="text-muted-foreground text-xs">
+                          <span className="text-muted-foreground truncate text-xs">
                             {cl.lead.owner.name}
                           </span>
                         </div>
                       )}
-                      <div className="mb-1 flex items-center gap-2">
-                        <h3 className="truncate font-semibold">
+                      <div className="mb-1 flex min-w-0 items-center gap-2">
+                        <h3 className="min-w-0 flex-1 truncate font-semibold">
                           {cl.lead.firstName} {cl.lead.lastName}
                         </h3>
                         {cl.lead.priority === "URGENT" && (
-                          <Star className="h-4 w-4 fill-red-500 text-red-500" />
+                          <Star className="h-4 w-4 flex-shrink-0 fill-red-500 text-red-500" />
                         )}
                       </div>
-                      <div className="text-muted-foreground mb-1 flex items-center gap-1 text-sm">
-                        <Phone className="h-3 w-3" />
-                        <span className="truncate">{cl.lead.phone}</span>
+                      <div className="text-muted-foreground mb-1 flex min-w-0 items-center gap-1 text-sm">
+                        <Phone className="h-3 w-3 flex-shrink-0" />
+                        <span className="min-w-0 flex-1 truncate">
+                          {cl.lead.phone}
+                        </span>
                       </div>
                       {(cl.lead as any).courseInterested && (
-                        <div className="text-muted-foreground mb-1 flex items-center gap-1 text-xs">
-                          <Tag className="h-3 w-3" />
-                          <span className="truncate">
+                        <div className="text-muted-foreground mb-2 flex min-w-0 items-start gap-1 text-xs">
+                          <Tag className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                          <span className="line-clamp-2 min-w-0 flex-1 break-words">
                             {(cl.lead as any).courseInterested}
                           </span>
                         </div>
                       )}
                       <Badge
-                        className={cn(
-                          "text-xs",
-                          statusStyles[
-                            cl.lead.status as keyof typeof statusStyles
-                          ],
-                        )}
+                        className="text-xs font-bold"
+                        style={{
+                          backgroundColor: `${getStatusColor(cl.lead.status)}20`,
+                          color: getStatusColor(cl.lead.status),
+                        }}
                       >
-                        {
-                          statusDisplayNames[
-                            cl.lead.status as keyof typeof statusDisplayNames
-                          ]
-                        }
+                        {cl.lead.status}
                       </Badge>
                     </div>
                   </div>

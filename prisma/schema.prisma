@@ -149,6 +149,8 @@ model Workspace {
   leadFields  LeadField[]
   deals       Deal[]
   webhookAssignmentRules WebhookAssignmentRule[]
+  leadStatusConfigs LeadStatusConfig[]
+  lostLeadReasons LostLeadReason[]
 
   @@map("workspaces")
 }
@@ -272,7 +274,7 @@ model Lead {
   // Lead Details
   source      String          @default("WEBSITE")  // Allows custom sources
   category    LeadCategory    @default(FRESH)
-  status      LeadStatus      @default(NEW_LEAD)
+  status      String          @default("New Lead") // Custom status from LeadStatusConfig
   priority    Priority        @default(MEDIUM)
   
   // Course Interest (for EasyLearning)
@@ -349,28 +351,6 @@ enum LeadCategory {
   FRESH
   ACTIVE
   CLOSED
-}
-
-enum LeadStatus {
-  // Fresh Category
-  NEW_LEAD
-  
-  // Active Category
-  INTERESTED
-  JUST_CURIOUS
-  FOLLOW_UP
-  CONTACTED
-  QUALIFIED
-  NEGOTIATION
-  
-  // Closed Category
-  NO_RESPONSE
-  NOT_INTERESTED
-  CONVERTED
-  LOST
-  DO_NOT_CONTACT
-  WON
-  DONE
 }
 
 enum Priority {
@@ -991,4 +971,43 @@ model WebhookAssignmentRule {
   @@index([campaignId])
   @@index([teamId])
   @@map("webhook_assignment_rules")
+}
+// Custom Lead Status Configuration
+model LeadStatusConfig {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  name        String   // Status name (e.g., "Interested", "Won", "Lost")
+  stage       String   // Stage: "INITIAL", "ACTIVE", "CLOSED"
+  color       String?  // Color code for UI (e.g., "#FF0000")
+  isDefault   Boolean  @default(false) // If true, this is the default status for new leads
+  isDeleted   Boolean  @default(false) // Soft delete
+  order       Int      @default(0) // Display order
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@index([stage])
+  @@map("lead_status_configs")
+}
+
+// Lost Lead Reasons (for Closed stage)
+model LostLeadReason {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  name        String   // Reason name (e.g., "Budget Issues", "Lost to competitor")
+  isDeleted   Boolean  @default(false)
+  order       Int      @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@map("lost_lead_reasons")
 }

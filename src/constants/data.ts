@@ -197,12 +197,6 @@ export const managerNavItems: NavItem[] = [
         shortcut: ["a", "a"],
       },
       {
-        title: "Lead Fields",
-        url: "/dashboard/workspace-settings",
-        icon: "settings",
-        shortcut: ["w", "f"],
-      },
-      {
         title: "Settings",
         shortcut: ["s", "s"],
         url: "/dashboard/settings",
@@ -305,10 +299,16 @@ export const adminNavItems: NavItem[] = [
         shortcut: ["a", "a"],
       },
       {
+        title: "Lead Status Fields",
+        url: "/dashboard/lead-fields",
+        icon: "listChecks",
+        shortcut: ["l", "f"],
+      },
+      {
         title: "Lead Fields",
         url: "/dashboard/workspace-settings",
         icon: "settings",
-        shortcut: ["w", "f"],
+        shortcut: ["w", "s"],
       },
     ],
   },
