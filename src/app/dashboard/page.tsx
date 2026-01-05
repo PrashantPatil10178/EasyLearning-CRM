@@ -36,7 +36,10 @@ export default async function Dashboard() {
     return (
       <PageContainer>
         <NewDashboard
-          user={session.user}
+          user={{
+            name: session.user.name ?? null,
+            image: session.user.image ?? null,
+          }}
           stats={stats}
           recentActivities={recentActivities}
           leadSourceDistribution={leadSourceDistribution}
