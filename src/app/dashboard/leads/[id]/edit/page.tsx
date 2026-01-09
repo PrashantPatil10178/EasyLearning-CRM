@@ -374,21 +374,21 @@ export default function EditLeadPage() {
                       {customFields
                         .filter((field) => field.isVisible)
                         .map((field) => {
-                          const value = customFieldsData[field.key] || \"\";
+                          const value = customFieldsData[field.key] || "";
                           
-                          if (field.type === \"SELECT\") {
+                          if (field.type === "SELECT") {
                             let options: string[] = [];
                             try {
-                              options = JSON.parse(field.options || \"[]\");
+                              options = JSON.parse(field.options || "[]");
                             } catch (e) {
                               options = [];
                             }
                             
                             return (
-                              <div key={field.id} className=\"space-y-2\">
+                              <div key={field.id} className="space-y-2">
                                 <Label htmlFor={field.key}>
                                   {field.name}
-                                  {field.isRequired && <span className=\"text-red-500 ml-1\">*</span>}
+                                  {field.isRequired && <span className="text-red-500 ml-1">*</span>}
                                 </Label>
                                 <Select
                                   value={value}
@@ -409,12 +409,12 @@ export default function EditLeadPage() {
                             );
                           }
                           
-                          if (field.type === \"TEXTAREA\") {
+                          if (field.type === "TEXTAREA") {
                             return (
-                              <div key={field.id} className=\"space-y-2 md:col-span-2\">
+                              <div key={field.id} className="space-y-2 md:col-span-2">
                                 <Label htmlFor={field.key}>
                                   {field.name}
-                                  {field.isRequired && <span className=\"text-red-500 ml-1\">*</span>}
+                                  {field.isRequired && <span className="text-red-500 ml-1">*</span>}
                                 </Label>
                                 <Textarea
                                   id={field.key}
@@ -427,17 +427,17 @@ export default function EditLeadPage() {
                             );
                           }
                           
-                          if (field.type === \"BOOLEAN\") {
+                          if (field.type === "BOOLEAN") {
                             return (
-                              <div key={field.id} className=\"flex items-center space-x-2\">
+                              <div key={field.id} className="flex items-center space-x-2">
                                 <Checkbox
                                   id={field.key}
                                   checked={!!value}
                                   onCheckedChange={(checked) => handleCustomFieldChange(field.key, checked)}
                                 />
-                                <Label htmlFor={field.key} className=\"cursor-pointer\">
+                                <Label htmlFor={field.key} className="cursor-pointer">
                                   {field.name}
-                                  {field.isRequired && <span className=\"text-red-500 ml-1\">*</span>}
+                                  {field.isRequired && <span className="text-red-500 ml-1">*</span>}
                                 </Label>
                               </div>
                             );
@@ -445,14 +445,14 @@ export default function EditLeadPage() {
                           
                           // Default: TEXT, NUMBER, EMAIL, etc.
                           return (
-                            <div key={field.id} className=\"space-y-2\">
+                            <div key={field.id} className="space-y-2">
                               <Label htmlFor={field.key}>
                                 {field.name}
-                                {field.isRequired && <span className=\"text-red-500 ml-1\">*</span>}
+                                {field.isRequired && <span className="text-red-500 ml-1">*</span>}
                               </Label>
                               <Input
                                 id={field.key}
-                                type={field.type === \"EMAIL\" ? \"email\" : field.type === \"NUMBER\" ? \"number\" : \"text\"}
+                                type={field.type === "EMAIL" ? "email" : field.type === "NUMBER" ? "number" : "text"}
                                 value={value}
                                 onChange={(e) => handleCustomFieldChange(field.key, e.target.value)}
                                 placeholder={field.name}
