@@ -25,13 +25,26 @@ export default async function Dashboard() {
   }
 
   try {
-    const [stats, recentActivities, leadSourceDistribution, upcomingFollowUps] =
-      await Promise.all([
-        api.dashboard.getStats(),
-        api.dashboard.getRecentActivities(),
-        api.dashboard.getLeadSourceDistribution(),
-        api.dashboard.getUpcomingFollowUps(),
-      ]);
+    const today = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+
+    const [
+      stats,
+      recentActivities,
+      leadSourceDistribution,
+      upcomingFollowUps,
+      revenueStats,
+    ] = await Promise.all([
+      api.dashboard.getStats(),
+      api.dashboard.getRecentActivities(),
+      api.dashboard.getLeadSourceDistribution(),
+      api.dashboard.getUpcomingFollowUps(),
+      api.analytics.getRevenueAnalytics({
+        startDate: thirtyDaysAgo,
+        endDate: today,
+      }),
+    ]);
 
     return (
       <PageContainer>
@@ -41,6 +54,7 @@ export default async function Dashboard() {
             image: session.user.image ?? null,
           }}
           stats={stats}
+          revenueStats={revenueStats}
           recentActivities={recentActivities}
           leadSourceDistribution={leadSourceDistribution}
           upcomingFollowUps={upcomingFollowUps}

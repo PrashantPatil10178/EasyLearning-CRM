@@ -17,6 +17,7 @@ import { searchRouter } from "@/server/api/routers/search";
 import { webhookRouter } from "@/server/api/routers/webhook";
 import { reportsRouter } from "@/server/api/routers/reports";
 import { leadStatusRouter } from "@/server/api/routers/leadStatus";
+import { analyticsRouter } from "@/server/api/routers/analytics";
 import { createCallerFactory, createTRPCRouter } from "@/server/api/trpc";
 
 /**
@@ -44,6 +45,7 @@ export const appRouter = createTRPCRouter({
   webhook: webhookRouter,
   reports: reportsRouter,
   leadStatus: leadStatusRouter,
+  analytics: analyticsRouter,
 });
 
 // export type definition of API

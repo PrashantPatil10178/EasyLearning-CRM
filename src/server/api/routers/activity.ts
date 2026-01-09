@@ -42,7 +42,6 @@ export const activityRouter = createTRPCRouter({
         });
       }
 
-      // Create note activity
       const activity = await ctx.db.activity.create({
         data: {
           leadId: input.leadId,

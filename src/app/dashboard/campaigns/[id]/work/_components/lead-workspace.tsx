@@ -42,6 +42,8 @@ import {
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useLeadStatuses } from "@/hooks/use-lead-statuses";
+import { api } from "@/trpc/react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const renderActivityMessage = (message: string | null | undefined) => {
   if (!message) return null;
@@ -191,6 +193,20 @@ export function LeadWorkspace({
   // Fetch custom lead statuses
   const { categories: statusCategories, isLoading: isLoadingStatuses } =
     useLeadStatuses();
+
+  // Fetch custom fields configuration
+  const { data: customFields, isLoading: isLoadingFields } =
+    api.settings.getLeadFields.useQuery();
+
+  // Parse custom fields from selectedLead
+  let parsedCustomFields: Record<string, any> = {};
+  if (selectedLead?.customFields) {
+    try {
+      parsedCustomFields = JSON.parse(selectedLead.customFields);
+    } catch (e) {
+      parsedCustomFields = {};
+    }
+  }
 
   return (
     <div
@@ -678,6 +694,176 @@ export function LeadWorkspace({
                         </div>
                       </CardContent>
                     </Card>
+
+                    {/* Custom Fields */}
+                    {customFields &&
+                      customFields.filter((f) => f.isVisible).length > 0 && (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-sm">
+                              Additional Information
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="grid gap-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                              {customFields
+                                .filter((field) => field.isVisible)
+                                .map((field) => {
+                                  const value =
+                                    parsedCustomFields[field.key] ||
+                                    editedLead[field.key] ||
+                                    "";
+
+                                  if (field.type === "SELECT") {
+                                    let options: string[] = [];
+                                    try {
+                                      options = JSON.parse(
+                                        field.options || "[]",
+                                      );
+                                    } catch (e) {
+                                      options = [];
+                                    }
+
+                                    return (
+                                      <div key={field.id} className="space-y-2">
+                                        <Label htmlFor={field.key}>
+                                          {field.name}
+                                          {field.isRequired && (
+                                            <span className="ml-1 text-red-500">
+                                              *
+                                            </span>
+                                          )}
+                                        </Label>
+                                        <Select
+                                          value={value}
+                                          onValueChange={(val) =>
+                                            setEditedLead({
+                                              ...editedLead,
+                                              [field.key]: val,
+                                            })
+                                          }
+                                          disabled={!isEditMode}
+                                        >
+                                          <SelectTrigger id={field.key}>
+                                            <SelectValue
+                                              placeholder={`Select ${field.name}`}
+                                            />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {options.map((option) => (
+                                              <SelectItem
+                                                key={option}
+                                                value={option}
+                                              >
+                                                {option}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    );
+                                  }
+
+                                  if (field.type === "TEXTAREA") {
+                                    return (
+                                      <div
+                                        key={field.id}
+                                        className="space-y-2 sm:col-span-2"
+                                      >
+                                        <Label htmlFor={field.key}>
+                                          {field.name}
+                                          {field.isRequired && (
+                                            <span className="ml-1 text-red-500">
+                                              *
+                                            </span>
+                                          )}
+                                        </Label>
+                                        <Textarea
+                                          id={field.key}
+                                          value={value}
+                                          onChange={(e) =>
+                                            setEditedLead({
+                                              ...editedLead,
+                                              [field.key]: e.target.value,
+                                            })
+                                          }
+                                          disabled={!isEditMode}
+                                          rows={3}
+                                          placeholder={field.name}
+                                        />
+                                      </div>
+                                    );
+                                  }
+
+                                  if (field.type === "BOOLEAN") {
+                                    return (
+                                      <div
+                                        key={field.id}
+                                        className="flex items-center space-x-2"
+                                      >
+                                        <Checkbox
+                                          id={field.key}
+                                          checked={!!value}
+                                          onCheckedChange={(checked) =>
+                                            setEditedLead({
+                                              ...editedLead,
+                                              [field.key]: checked,
+                                            })
+                                          }
+                                          disabled={!isEditMode}
+                                        />
+                                        <Label
+                                          htmlFor={field.key}
+                                          className="cursor-pointer"
+                                        >
+                                          {field.name}
+                                          {field.isRequired && (
+                                            <span className="ml-1 text-red-500">
+                                              *
+                                            </span>
+                                          )}
+                                        </Label>
+                                      </div>
+                                    );
+                                  }
+
+                                  // Default: TEXT, NUMBER, EMAIL, etc.
+                                  return (
+                                    <div key={field.id} className="space-y-2">
+                                      <Label htmlFor={field.key}>
+                                        {field.name}
+                                        {field.isRequired && (
+                                          <span className="ml-1 text-red-500">
+                                            *
+                                          </span>
+                                        )}
+                                      </Label>
+                                      <Input
+                                        id={field.key}
+                                        type={
+                                          field.type === "EMAIL"
+                                            ? "email"
+                                            : field.type === "NUMBER"
+                                              ? "number"
+                                              : "text"
+                                        }
+                                        value={value}
+                                        onChange={(e) =>
+                                          setEditedLead({
+                                            ...editedLead,
+                                            [field.key]: e.target.value,
+                                          })
+                                        }
+                                        disabled={!isEditMode}
+                                        placeholder={field.name}
+                                      />
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
 
                     {selectedLead?.category === "FRESH" && isEditMode && (
                       <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950">

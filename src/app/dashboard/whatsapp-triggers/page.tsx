@@ -47,11 +47,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  LEAD_STATUS_HIERARCHY,
-  ALL_LEAD_STATUSES,
-  statusStyles,
-} from "@/lib/lead-status";
+import { useLeadStatuses } from "@/hooks/use-lead-statuses";
 
 // Common template parameters for AISensy
 const TEMPLATE_PARAMS = [
@@ -73,6 +69,13 @@ export default function WhatsAppTriggersPage() {
 
   const utils = api.useUtils();
   const { data: triggers, isLoading } = api.whatsapp.getTriggers.useQuery();
+
+  // Fetch custom lead statuses
+  const {
+    categories,
+    allStatuses,
+    isLoading: isLoadingStatuses,
+  } = useLeadStatuses();
 
   // Check if AISensy integration is active
   const { data: aisensyIntegration, isLoading: isCheckingIntegration } =
@@ -199,7 +202,7 @@ export default function WhatsAppTriggersPage() {
 
   // Get configured statuses
   const configuredStatuses = new Set(triggers?.map((t) => t.status) || []);
-  const availableStatuses = ALL_LEAD_STATUSES.filter(
+  const availableStatuses = allStatuses.filter(
     (s) =>
       !configuredStatuses.has(s.value) ||
       (editingTrigger && s.value === editingTrigger.status),
@@ -207,16 +210,16 @@ export default function WhatsAppTriggersPage() {
 
   const getStatusInfo = (status: string) => {
     return (
-      ALL_LEAD_STATUSES.find((s) => s.value === status) || {
+      allStatuses.find((s) => s.value === status) || {
         label: status,
         value: status,
-        color: "gray",
+        color: "#6B7280",
       }
     );
   };
 
   // Show setup message if AISensy is not configured
-  if (isCheckingIntegration) {
+  if (isCheckingIntegration || isLoadingStatuses) {
     return (
       <PageContainer>
         <div className="flex h-[50vh] items-center justify-center">
@@ -404,11 +407,11 @@ export default function WhatsAppTriggersPage() {
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
                             <Badge
-                              className={
-                                statusStyles[
-                                  trigger.status as keyof typeof statusStyles
-                                ]
-                              }
+                              className="text-xs font-bold"
+                              style={{
+                                backgroundColor: `${statusInfo.color}20`,
+                                color: statusInfo.color,
+                              }}
                             >
                               {statusInfo.label}
                             </Badge>
@@ -483,11 +486,11 @@ export default function WhatsAppTriggersPage() {
                         <div className="space-y-1 opacity-60">
                           <div className="flex items-center gap-2">
                             <Badge
-                              className={
-                                statusStyles[
-                                  trigger.status as keyof typeof statusStyles
-                                ]
-                              }
+                              className="text-xs font-bold"
+                              style={{
+                                backgroundColor: `${statusInfo.color}20`,
+                                color: statusInfo.color,
+                              }}
                             >
                               {statusInfo.label}
                             </Badge>
@@ -639,7 +642,7 @@ export default function WhatsAppTriggersPage() {
                     <SelectValue placeholder="👉 Pick a lead status..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {LEAD_STATUS_HIERARCHY.map((category) => (
+                    {categories.map((category) => (
                       <div key={category.value}>
                         <div className="text-muted-foreground px-2 py-1.5 text-sm font-semibold">
                           {category.label}
@@ -659,11 +662,11 @@ export default function WhatsAppTriggersPage() {
                             >
                               <div className="flex items-center gap-2">
                                 <Badge
-                                  className={
-                                    statusStyles[
-                                      status.value as keyof typeof statusStyles
-                                    ]
-                                  }
+                                  className="text-xs font-bold"
+                                  style={{
+                                    backgroundColor: `${status.color}20`,
+                                    color: status.color,
+                                  }}
                                 >
                                   {status.label}
                                 </Badge>
@@ -884,11 +887,11 @@ export default function WhatsAppTriggersPage() {
                       <span className="text-lg">📱</span>
                       When lead changes to{" "}
                       <Badge
-                        className={
-                          statusStyles[
-                            selectedStatus as keyof typeof statusStyles
-                          ]
-                        }
+                        className="text-xs font-bold"
+                        style={{
+                          backgroundColor: `${getStatusInfo(selectedStatus).color}20`,
+                          color: getStatusInfo(selectedStatus).color,
+                        }}
                       >
                         {getStatusInfo(selectedStatus).label}
                       </Badge>

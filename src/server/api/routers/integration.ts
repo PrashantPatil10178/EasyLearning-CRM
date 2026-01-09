@@ -37,12 +37,30 @@ export const integrationRouter = createTRPCRouter({
       try {
         const config = JSON.parse(integration.config);
 
-        // Decrypt if encrypted
+        // Try to decrypt if encrypted, but handle failures gracefully
         if (config.apiKey && isEncrypted(config.apiKey)) {
-          config.apiKey = decrypt(config.apiKey);
+          try {
+            config.apiKey = decrypt(config.apiKey);
+          } catch (decryptError) {
+            // Decryption failed - likely encrypted with different AUTH_SECRET
+            // Clear the corrupted value and let user re-enter
+            console.warn(
+              `Integration ${integration.provider}: apiKey decryption failed. Please re-enter credentials.`,
+            );
+            config.apiKey = "";
+          }
         }
         if (config.secretKey && isEncrypted(config.secretKey)) {
-          config.secretKey = decrypt(config.secretKey);
+          try {
+            config.secretKey = decrypt(config.secretKey);
+          } catch (decryptError) {
+            // Decryption failed - likely encrypted with different AUTH_SECRET
+            // Clear the corrupted value and let user re-enter
+            console.warn(
+              `Integration ${integration.provider}: secretKey decryption failed. Please re-enter credentials.`,
+            );
+            config.secretKey = "";
+          }
         }
 
         // Mask sensitive fields for frontend

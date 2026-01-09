@@ -18,13 +18,9 @@ export function encrypt(text: string): string {
   const cipher = crypto.createCipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
   let encrypted = cipher.update(text, "utf8", "hex");
   encrypted += cipher.final("hex");
-  // Return IV + encrypted data
   return iv.toString("hex") + ":" + encrypted;
 }
 
-/**
- * Decrypt sensitive data
- */
 export function decrypt(text: string): string {
   const parts = text.split(":");
   if (parts.length !== 2) {

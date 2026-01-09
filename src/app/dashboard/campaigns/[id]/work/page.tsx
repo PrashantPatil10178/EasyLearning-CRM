@@ -164,6 +164,17 @@ export default function CampaignWorkPage() {
   useEffect(() => {
     if (selectedLead) {
       setRevenue((selectedLead as any).revenue?.toString() || "");
+
+      // Parse custom fields from lead
+      let parsedCustomFields = {};
+      if ((selectedLead as any).customFields) {
+        try {
+          parsedCustomFields = JSON.parse((selectedLead as any).customFields);
+        } catch (e) {
+          parsedCustomFields = {};
+        }
+      }
+
       setEditedLead({
         firstName: selectedLead.firstName || "",
         lastName: selectedLead.lastName || "",
@@ -174,6 +185,7 @@ export default function CampaignWorkPage() {
         state: selectedLead.state || "",
         priority: selectedLead.priority || "MEDIUM",
         revenue: (selectedLead as any).revenue || 0,
+        ...parsedCustomFields, // Include custom fields
       });
       setIsEditMode(false);
       // Reset to activity tab when lead changes
@@ -412,9 +424,35 @@ export default function CampaignWorkPage() {
   const handleSaveLeadEdits = () => {
     if (!selectedLeadId) return;
 
+    // Standard lead fields
+    const standardFields = [
+      "firstName",
+      "lastName",
+      "email",
+      "phone",
+      "courseInterested",
+      "city",
+      "state",
+      "priority",
+      "revenue",
+    ];
+
+    // Separate standard fields from custom fields
+    const standardData: any = {};
+    const customData: any = {};
+
+    Object.entries(editedLead).forEach(([key, value]) => {
+      if (standardFields.includes(key)) {
+        standardData[key] = value;
+      } else {
+        customData[key] = value;
+      }
+    });
+
     const updates: any = {
       id: selectedLeadId,
-      ...editedLead,
+      ...standardData,
+      customFields: JSON.stringify(customData),
     };
 
     // Automatically move to ACTIVE category if it was FRESH

@@ -2,7 +2,13 @@
 
 import PageContainer from "@/components/layout/page-container";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/trpc/react";
@@ -196,12 +202,15 @@ export default function CampaignsPage() {
         </div>
 
         {/* View Mode Tabs */}
-        <div className="flex items-center gap-2">
+        {/* View Mode Toggle */}
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant={viewMode === "all" ? "default" : "outline"}
             size="sm"
             onClick={() => setViewMode("all")}
+            className="gap-2"
           >
+            <Megaphone className="h-4 w-4" />
             All Campaigns
           </Button>
           <Button
@@ -232,41 +241,46 @@ export default function CampaignsPage() {
             <Loader2 className="text-primary h-8 w-8 animate-spin" />
           </div>
         ) : displayCampaigns?.length === 0 ? (
-          <Card className="flex h-96 flex-col items-center justify-center text-center">
-            <div className="bg-primary/10 rounded-full p-4">
-              <Target className="text-primary h-8 w-8" />
+          <Card className="data-[slot=card]:from-primary/5 data-[slot=card]:to-card dark:data-[slot=card]:bg-card @container/card flex h-96 flex-col items-center justify-center text-center data-[slot=card]:bg-gradient-to-t data-[slot=card]:shadow-xs">
+            <div className="bg-primary/10 rounded-full p-6">
+              <Target className="text-primary h-10 w-10" />
             </div>
-            <h3 className="mt-4 text-lg font-semibold">
+            <h3 className="mt-6 text-xl font-semibold">
               {viewMode === "myteams"
                 ? "No team campaigns found"
                 : "No campaigns found"}
             </h3>
-            <p className="text-muted-foreground mt-2 mb-4 max-w-sm">
+            <p className="text-muted-foreground mt-2 mb-6 max-w-md text-sm">
               {viewMode === "myteams"
                 ? "No campaigns have been assigned to your teams yet"
                 : "Create your first campaign to filter and manage leads by timeline and source"}
             </p>
             {viewMode === "all" && (
-              <Button asChild>
-                <Link href="/dashboard/campaigns/new">Create Campaign</Link>
+              <Button asChild size="lg" className="gap-2">
+                <Link href="/dashboard/campaigns/new">
+                  <Plus className="h-4 w-4" />
+                  Create Campaign
+                </Link>
               </Button>
             )}
           </Card>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid gap-6 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs md:grid-cols-2 lg:grid-cols-3">
             {displayCampaigns?.map((campaign: any) => (
               <Card
                 key={campaign.id}
-                className="group relative overflow-hidden transition-all hover:shadow-lg"
+                className="group @container/card relative overflow-hidden transition-all"
               >
-                <CardHeader className="pb-3">
+                <CardHeader>
                   <div className="flex items-start justify-between">
-                    <div className="flex-1 space-y-1">
-                      <CardTitle className="text-lg">{campaign.name}</CardTitle>
+                    <div className="flex-1">
+                      <CardTitle className="text-base">
+                        {campaign.name}
+                      </CardTitle>
                       {campaign.description && (
-                        <p className="text-muted-foreground line-clamp-2 text-xs">
+                        <CardDescription className="mt-1.5 line-clamp-2">
                           {campaign.description}
-                        </p>
+                        </CardDescription>
                       )}
                     </div>
                     <DropdownMenu>
@@ -306,12 +320,11 @@ export default function CampaignsPage() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                  <div className="flex flex-wrap gap-2 pt-2">
+                  <div className="flex flex-wrap gap-2 pt-3">
                     <Badge
                       variant={
                         campaign.status === "ACTIVE" ? "default" : "secondary"
                       }
-                      className="text-xs"
                     >
                       {campaign.status}
                     </Badge>
@@ -326,9 +339,9 @@ export default function CampaignsPage() {
                     )}
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 px-2 pt-4 sm:px-6 sm:pt-6">
                   {/* Filter Info */}
-                  <div className="bg-muted/30 space-y-2 rounded-lg border p-3">
+                  <div className="bg-muted/50 space-y-2.5 rounded-lg p-3.5">
                     <div className="flex items-center gap-2 text-sm">
                       <Clock className="text-primary h-4 w-4" />
                       <span className="text-muted-foreground">Timeline:</span>
@@ -349,33 +362,33 @@ export default function CampaignsPage() {
 
                   {/* Stats */}
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1 rounded-lg border p-2">
-                      <span className="text-muted-foreground flex items-center gap-1 text-xs">
-                        <Users className="h-3 w-3" /> Total Leads
-                      </span>
-                      <span className="text-2xl font-bold">
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                        <Users className="h-3.5 w-3.5" /> Total Leads
+                      </p>
+                      <p className="text-2xl font-bold">
                         {campaign._count?.leads || 0}
-                      </span>
+                      </p>
                     </div>
-                    <div className="flex flex-col gap-1 rounded-lg border p-2">
-                      <span className="text-muted-foreground flex items-center gap-1 text-xs">
-                        <Target className="h-3 w-3" /> Members
-                      </span>
-                      <span className="text-2xl font-bold">
+                    <div className="space-y-1">
+                      <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                        <Target className="h-3.5 w-3.5" /> Members
+                      </p>
+                      <p className="text-2xl font-bold">
                         {campaign._count?.members || 0}
-                      </span>
+                      </p>
                     </div>
                   </div>
 
                   {/* Work Button */}
                   <Button
-                    className="w-full"
+                    className="w-full gap-2"
                     onClick={() =>
                       router.push(`/dashboard/campaigns/${campaign.id}/work`)
                     }
                   >
                     Start Working
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                    <ArrowRight className="h-4 w-4" />
                   </Button>
                 </CardContent>
               </Card>

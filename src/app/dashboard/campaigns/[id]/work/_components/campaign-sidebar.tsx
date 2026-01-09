@@ -14,8 +14,15 @@ import {
   ResponsiveContainer,
   Legend,
   Tooltip,
+  Label,
 } from "recharts";
 import { useMemo } from "react";
+import {
+  ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 
 interface CampaignSidebarProps {
   campaign: any;
@@ -81,6 +88,19 @@ export function CampaignSidebar({
       color: chartColors[index % chartColors.length],
     }))
     .filter((item) => item.value > 0);
+
+  const chartConfig = useMemo(() => {
+    const config: Record<string, { label: string; color?: string }> = {
+      value: { label: "Leads" },
+    };
+    pieChartData.forEach((item, index) => {
+      config[item.name] = {
+        label: item.name,
+        color: "var(--primary)",
+      };
+    });
+    return config as ChartConfig;
+  }, [pieChartData]);
 
   const totalLeads = campaign?.leads?.length || 0;
 
@@ -175,65 +195,117 @@ export function CampaignSidebar({
                     Agent Distribution
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
                   {totalLeads > 0 && pieChartData.length > 0 ? (
-                    <div className="space-y-3">
-                      {/* Pie Chart */}
-                      <ResponsiveContainer width="110%" height={160}>
-                        <RechartsPieChart>
-                          <Pie
-                            data={pieChartData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={45}
-                            outerRadius={70}
-                            paddingAngle={2}
-                            dataKey="value"
-                            label={({ percent }: any) =>
-                              `${(percent * 100).toFixed(0)}%`
-                            }
-                          >
-                            {pieChartData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "hsl(var(--background))",
-                              border: "1px solid hsl(var(--border))",
-                              borderRadius: "8px",
-                              fontSize: "12px",
-                            }}
-                            formatter={(value: number) => [value, "Leads"]}
-                          />
-                        </RechartsPieChart>
-                      </ResponsiveContainer>
-
-                      {/* Legend with agent names and counts */}
-                      <div className="max-h-28 space-y-1.5 overflow-y-auto">
-                        {pieChartData.map((agent) => (
-                          <div
-                            key={agent.name}
-                            className="flex items-center justify-between text-xs"
-                          >
-                            <span className="flex items-center gap-2">
-                              <div
-                                className="h-2.5 w-2.5 flex-shrink-0 rounded-sm"
-                                style={{ backgroundColor: agent.color }}
+                    <ChartContainer
+                      config={chartConfig}
+                      className="mx-auto aspect-square h-[200px]"
+                    >
+                      <RechartsPieChart>
+                        <defs>
+                          {pieChartData.map((agent, index) => (
+                            <linearGradient
+                              key={agent.name}
+                              id={`fill${agent.name.replace(/[^a-zA-Z0-9]/g, "")}`}
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="0%"
+                                stopColor="var(--primary)"
+                                stopOpacity={1 - index * 0.15}
                               />
-                              <span className="truncate">{agent.name}</span>
-                            </span>
-                            <span className="ml-2 font-semibold">
-                              {agent.value}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                              <stop
+                                offset="100%"
+                                stopColor="var(--primary)"
+                                stopOpacity={0.8 - index * 0.15}
+                              />
+                            </linearGradient>
+                          ))}
+                        </defs>
+                        <ChartTooltip
+                          cursor={false}
+                          content={<ChartTooltipContent hideLabel />}
+                        />
+                        <Pie
+                          data={pieChartData.map((item) => ({
+                            ...item,
+                            fill: `url(#fill${item.name.replace(/[^a-zA-Z0-9]/g, "")})`,
+                          }))}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={50}
+                          strokeWidth={2}
+                          stroke="var(--background)"
+                        >
+                          <Label
+                            content={({ viewBox }) => {
+                              if (
+                                viewBox &&
+                                "cx" in viewBox &&
+                                "cy" in viewBox
+                              ) {
+                                return (
+                                  <text
+                                    x={viewBox.cx}
+                                    y={viewBox.cy}
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                  >
+                                    <tspan
+                                      x={viewBox.cx}
+                                      y={viewBox.cy}
+                                      className="fill-foreground text-2xl font-bold"
+                                    >
+                                      {totalLeads.toLocaleString()}
+                                    </tspan>
+                                    <tspan
+                                      x={viewBox.cx}
+                                      y={(viewBox.cy || 0) + 20}
+                                      className="fill-muted-foreground text-xs"
+                                    >
+                                      Total Leads
+                                    </tspan>
+                                  </text>
+                                );
+                              }
+                            }}
+                          />
+                        </Pie>
+                      </RechartsPieChart>
+                    </ChartContainer>
                   ) : (
                     <p className="text-muted-foreground py-6 text-center text-xs">
                       No leads assigned yet
                     </p>
+                  )}
+                  {/* Legend below chart */}
+                  {totalLeads > 0 && (
+                    <div className="mt-4 max-h-28 space-y-1.5 overflow-y-auto">
+                      {pieChartData.map((agent, index) => (
+                        <div
+                          key={agent.name}
+                          className="flex items-center justify-between text-xs"
+                        >
+                          <span className="flex items-center gap-2">
+                            <div
+                              className="h-2.5 w-2.5 flex-shrink-0 rounded-sm"
+                              style={{
+                                background: `linear-gradient(to bottom, 
+                                    hsl(var(--primary) / ${1 - index * 0.15}), 
+                                    hsl(var(--primary) / ${0.8 - index * 0.15}))`,
+                              }}
+                            />
+                            <span className="truncate">{agent.name}</span>
+                          </span>
+                          <span className="ml-2 font-semibold">
+                            {agent.value}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </CardContent>
               </Card>
