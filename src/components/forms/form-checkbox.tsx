@@ -1,6 +1,6 @@
 'use client';
 
-import { FieldPath, FieldValues } from 'react-hook-form';
+import { type FieldPath, type FieldValues } from 'react-hook-form';
 import {
   FormControl,
   FormDescription,
@@ -10,7 +10,7 @@ import {
   FormMessage
 } from '@/components/ui/form';
 import { Checkbox } from '@/components/ui/checkbox';
-import { BaseFormFieldProps } from '@/types/base-form';
+import { type BaseFormFieldProps } from '@/types/base-form';
 
 interface FormCheckboxProps<
   TFieldValues extends FieldValues = FieldValues,

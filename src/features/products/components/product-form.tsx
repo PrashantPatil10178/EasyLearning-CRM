@@ -7,7 +7,7 @@ import { FormTextarea } from "@/components/forms/form-textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
-import { Product } from "@/constants/mock-api";
+import { type Product } from "@/constants/mock-api";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";

@@ -1,6 +1,6 @@
 'use client';
 
-import { FieldPath, FieldValues } from 'react-hook-form';
+import { type FieldPath, type FieldValues } from 'react-hook-form';
 import {
   FormControl,
   FormDescription,
@@ -10,7 +10,7 @@ import {
   FormMessage
 } from '@/components/ui/form';
 import { Slider } from '@/components/ui/slider';
-import { BaseFormFieldProps, SliderConfig } from '@/types/base-form';
+import { type BaseFormFieldProps, type SliderConfig } from '@/types/base-form';
 
 interface FormSliderProps<
   TFieldValues extends FieldValues = FieldValues,

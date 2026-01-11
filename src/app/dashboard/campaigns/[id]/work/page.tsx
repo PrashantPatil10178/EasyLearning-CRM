@@ -13,6 +13,7 @@ import { LeadList } from "./_components/lead-list";
 import { LeadWorkspace } from "./_components/lead-workspace";
 import { TransferLeadDialog } from "./_components/transfer-lead-dialog";
 import { LeadFilterHeader } from "./_components/lead-filter-header";
+import { CallCompletedPopup } from "@/components/call-completed-popup";
 
 type LeadType = "NEW" | "ACTIVE";
 type ViewMode = "list" | "details";
@@ -37,8 +38,20 @@ export default function CampaignWorkPage() {
   const [visibleLeadsCount, setVisibleLeadsCount] = useState(20);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
+  // Call completion popup state
+  const [callPopupOpen, setCallPopupOpen] = useState(false);
+  const [completedCall, setCompletedCall] = useState<any>(null);
+
   // Editable lead fields
   const [editedLead, setEditedLead] = useState<any>({});
+
+  // Log component mount
+  useEffect(() => {
+    console.log("[CampaignWorkPage] Component mounted/remounted");
+    return () => {
+      console.log("[CampaignWorkPage] Component unmounting");
+    };
+  }, []);
 
   // API Queries
   const {
@@ -47,6 +60,47 @@ export default function CampaignWorkPage() {
     refetch: refetchCampaign,
   } = api.campaign.getById.useQuery({
     id: campaignId,
+  });
+
+  // Subscribe to call events
+  api.callLog.onCallEvent.useSubscription(undefined, {
+    onStarted: () => {
+      console.log("[Call Event] Subscription STARTED - Client connected");
+    },
+    onData: (event: any) => {
+      console.log("[Call Event]", event);
+      console.log("[Call Event] Event type:", event?.type);
+      console.log("[Call Event] Call data:", event?.call);
+
+      if (event?.type === "live_call") {
+        // Show toast for live call
+        toast.info("Call in progress...", {
+          description: `Calling ${event?.call?.toNumber || ""}`,
+        });
+      } else if (event?.type === "call_completed") {
+        console.log("[Call Event] Setting popup state - call:", event?.call);
+        // Show popup for completed call
+        setCompletedCall(event?.call);
+        setCallPopupOpen(true);
+        console.log("[Call Event] Popup should now be open");
+
+        // Refresh campaign data to update activities
+        void refetchCampaign();
+
+        // Show success toast
+        toast.success("Call completed", {
+          description: `Call with ${event?.call?.lead?.firstName || ""} ${event?.call?.lead?.lastName || ""} has ended`,
+        });
+      }
+    },
+    onError: (error) => {
+      console.error("[Call Event Error]", error);
+      // Attempt to reconnect on error
+      console.log("[Call Event] Attempting to reconnect...");
+    },
+    onStopped: () => {
+      console.log("[Call Event] Subscription STOPPED - Client disconnected");
+    },
   });
 
   // Filter leads by category with memoization
@@ -610,6 +664,15 @@ export default function CampaignWorkPage() {
             handleTransferLead={handleTransferLead}
             transferLeadMutation={transferLeadMutation}
           />
+
+          {/* Call Completed Popup */}
+          {completedCall && (
+            <CallCompletedPopup
+              call={completedCall}
+              open={callPopupOpen}
+              onClose={() => setCallPopupOpen(false)}
+            />
+          )}
         </div>
       </ScrollArea>
     </PageContainer>

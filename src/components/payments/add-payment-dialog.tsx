@@ -65,7 +65,7 @@ export function AddPaymentDialog({
     setPaymentMode("ONLINE");
     setStatus("COMPLETED");
     setTransactionId("");
-    setPaymentDate(new Date().toISOString().split("T")[0]!);
+    setPaymentDate(new Date().toISOString().split("T")[0]);
     setNotes("");
   };
 

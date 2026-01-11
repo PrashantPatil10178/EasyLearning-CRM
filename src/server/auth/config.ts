@@ -5,6 +5,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 
 import { db } from "@/server/db";
+import { env } from "@/env";
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -32,7 +33,10 @@ declare module "next-auth" {
  */
 export const authConfig = {
   providers: [
-    GoogleProvider,
+    GoogleProvider({
+      clientId: env.AUTH_GOOGLE_ID,
+      clientSecret: env.AUTH_GOOGLE_SECRET,
+    }),
     CredentialsProvider({
       id: "email",
       name: "Email",
@@ -42,12 +46,16 @@ export const authConfig = {
       },
       async authorize(credentials) {
         try {
+          console.log("[Auth] Authorizing credentials:", {
+            email: credentials?.email,
+          });
           const { email, password } = credentials as {
             email: string;
             password: string;
           };
 
           if (!email || !password) {
+            console.log("[Auth] Missing email or password");
             return null;
           }
 
@@ -56,7 +64,8 @@ export const authConfig = {
             where: { email },
           });
 
-          if (!user || !user.password) {
+          if (!user?.password) {
+            console.log("[Auth] User not found or has no password");
             return null;
           }
 
@@ -64,9 +73,11 @@ export const authConfig = {
           const isValidPassword = await bcrypt.compare(password, user.password);
 
           if (!isValidPassword) {
+            console.log("[Auth] Invalid password");
             return null;
           }
 
+          console.log("[Auth] Authorization successful for user:", user.id);
           return {
             id: user.id,
             phone: user.phone,

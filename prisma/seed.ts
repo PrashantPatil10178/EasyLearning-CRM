@@ -1,11 +1,4 @@
-import {
-  PrismaClient,
-  LeadSource,
-  LeadStatus,
-  Priority,
-  DealStage,
-  CourseMode,
-} from "@prisma/client";
+import { PrismaClient, Priority, DealStage, CourseMode } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -64,39 +57,45 @@ async function main() {
   console.log("Courses created/verified.");
 
   // Create sample batches
-  const batch1 = await prisma.batch.upsert({
+  const batch1Name = "JEE Main Morning Batch";
+  let batch1 = await prisma.batch.findFirst({
     where: {
-      courseId_name: { courseId: course1.id, name: "JEE Main Morning Batch" },
-    },
-    update: {},
-    create: {
       courseId: course1.id,
-      name: "JEE Main Morning Batch",
-      startDate: new Date("2025-02-01"),
-      endDate: new Date("2025-07-31"),
-      maxStudents: 50,
-      enrolledCount: 32,
-      timing: "9:00 AM - 12:00 PM",
-      isActive: true,
+      name: batch1Name,
     },
   });
 
-  const batch2 = await prisma.batch.upsert({
+  if (!batch1) {
+    batch1 = await prisma.batch.create({
+      data: {
+        courseId: course1.id,
+        name: batch1Name,
+        startDate: new Date("2025-02-01"),
+        endDate: new Date("2025-07-31"),
+        timing: "9:00 AM - 12:00 PM",
+      },
+    });
+  }
+
+  const batch2Name = "NEET Evening Batch";
+  let batch2 = await prisma.batch.findFirst({
     where: {
-      courseId_name: { courseId: course2.id, name: "NEET Evening Batch" },
-    },
-    update: {},
-    create: {
       courseId: course2.id,
-      name: "NEET Evening Batch",
-      startDate: new Date("2025-02-15"),
-      endDate: new Date("2025-10-15"),
-      maxStudents: 40,
-      enrolledCount: 28,
-      timing: "4:00 PM - 7:00 PM",
-      isActive: true,
+      name: batch2Name,
     },
   });
+
+  if (!batch2) {
+    batch2 = await prisma.batch.create({
+      data: {
+        courseId: course2.id,
+        name: batch2Name,
+        startDate: new Date("2025-02-15"),
+        endDate: new Date("2025-10-15"),
+        timing: "4:00 PM - 7:00 PM",
+      },
+    });
+  }
 
   console.log("Batches created/verified.");
 

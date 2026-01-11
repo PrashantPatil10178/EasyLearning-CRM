@@ -203,6 +203,6 @@ export const webhookRouter = createTRPCRouter({
       distinct: ["source"],
     });
 
-    return leads.map((lead) => lead.source).filter(Boolean) as string[];
+    return leads.map((lead) => lead.source).filter(Boolean);
   }),
 });

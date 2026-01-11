@@ -602,8 +602,7 @@ export default function LeadDetailPage() {
                                       </p>
                                     )}
                                     <p className="text-muted-foreground leading-relaxed">
-                                      {(activity as any).message ||
-                                        activity.description}
+                                      {activity.message || activity.description}
                                     </p>
                                     {activity.user && (
                                       <div className="text-muted-foreground mt-2 flex items-center gap-2 text-sm">

@@ -1,6 +1,6 @@
 'use client';
 
-import { FieldPath, FieldValues } from 'react-hook-form';
+import { type FieldPath, type FieldValues } from 'react-hook-form';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import {
@@ -18,7 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger
 } from '@/components/ui/popover';
-import { BaseFormFieldProps, DatePickerConfig } from '@/types/base-form';
+import { type BaseFormFieldProps, type DatePickerConfig } from '@/types/base-form';
 
 interface FormDatePickerProps<
   TFieldValues extends FieldValues = FieldValues,

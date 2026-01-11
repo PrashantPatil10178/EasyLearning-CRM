@@ -63,11 +63,11 @@ export function TransferLeadDialog({
               </SelectTrigger>
               <SelectContent>
                 {/* Show team members if team is assigned, otherwise show campaign members */}
-                {campaign?.team && campaign.team.members
+                {campaign?.team?.members
                   ? campaign.team.members
                       .filter(
                         (tm: any) =>
-                          tm.userId !== (selectedLead as any)?.ownerId,
+                          tm.userId !== (selectedLead)?.ownerId,
                       )
                       .map((teamMember: any) => (
                         <SelectItem
@@ -89,7 +89,7 @@ export function TransferLeadDialog({
                       ))
                   : campaign?.members
                       .filter(
-                        (m: any) => m.userId !== (selectedLead as any)?.ownerId,
+                        (m: any) => m.userId !== (selectedLead)?.ownerId,
                       )
                       .map((member: any) => (
                         <SelectItem key={member.userId} value={member.userId}>

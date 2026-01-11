@@ -49,14 +49,17 @@ export default function EditLeadPage() {
     source: "MANUAL",
     notes: "",
   });
-  
-  const [customFieldsData, setCustomFieldsData] = useState<Record<string, any>>({});
+
+  const [customFieldsData, setCustomFieldsData] = useState<Record<string, any>>(
+    {},
+  );
 
   const { data: lead, isLoading } = api.lead.getById.useQuery({ id: leadId });
-  
+
   // Fetch custom fields configuration
-  const { data: customFields, isLoading: isLoadingFields } = api.settings.getLeadFields.useQuery();
-  
+  const { data: customFields, isLoading: isLoadingFields } =
+    api.settings.getLeadFields.useQuery();
+
   // Fetch custom statuses
   const { categories: statusCategories, allStatuses } = useLeadStatuses();
 
@@ -84,9 +87,9 @@ export default function EditLeadPage() {
         status: lead.status || "",
         priority: lead.priority || "MEDIUM",
         source: lead.source || "MANUAL",
-        notes: lead.notes || "",
+        notes: "",
       });
-      
+
       // Parse custom fields
       if (lead.customFields) {
         try {
@@ -118,7 +121,7 @@ export default function EditLeadPage() {
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
-  
+
   const handleCustomFieldChange = (key: string, value: any) => {
     setCustomFieldsData((prev) => ({ ...prev, [key]: value }));
   };
@@ -366,106 +369,157 @@ export default function EditLeadPage() {
               <Separator />
 
               {/* Custom Fields */}
-              {customFields && customFields.filter(f => f.isVisible).length > 0 && (
-                <>
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Additional Information</h3>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {customFields
-                        .filter((field) => field.isVisible)
-                        .map((field) => {
-                          const value = customFieldsData[field.key] || "";
-                          
-                          if (field.type === "SELECT") {
-                            let options: string[] = [];
-                            try {
-                              options = JSON.parse(field.options || "[]");
-                            } catch (e) {
-                              options = [];
+              {customFields &&
+                customFields.filter((f) => f.isVisible).length > 0 && (
+                  <>
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">
+                        Additional Information
+                      </h3>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {customFields
+                          .filter((field) => field.isVisible)
+                          .map((field) => {
+                            const value = customFieldsData[field.key] || "";
+
+                            if (field.type === "SELECT") {
+                              let options: string[] = [];
+                              try {
+                                options = JSON.parse(field.options || "[]");
+                              } catch (e) {
+                                options = [];
+                              }
+
+                              return (
+                                <div key={field.id} className="space-y-2">
+                                  <Label htmlFor={field.key}>
+                                    {field.name}
+                                    {field.isRequired && (
+                                      <span className="ml-1 text-red-500">
+                                        *
+                                      </span>
+                                    )}
+                                  </Label>
+                                  <Select
+                                    value={value}
+                                    onValueChange={(val) =>
+                                      handleCustomFieldChange(field.key, val)
+                                    }
+                                  >
+                                    <SelectTrigger id={field.key}>
+                                      <SelectValue
+                                        placeholder={`Select ${field.name}`}
+                                      />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {options.map((option) => (
+                                        <SelectItem key={option} value={option}>
+                                          {option}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              );
                             }
-                            
+
+                            if (field.type === "TEXTAREA") {
+                              return (
+                                <div
+                                  key={field.id}
+                                  className="space-y-2 md:col-span-2"
+                                >
+                                  <Label htmlFor={field.key}>
+                                    {field.name}
+                                    {field.isRequired && (
+                                      <span className="ml-1 text-red-500">
+                                        *
+                                      </span>
+                                    )}
+                                  </Label>
+                                  <Textarea
+                                    id={field.key}
+                                    value={value}
+                                    onChange={(e) =>
+                                      handleCustomFieldChange(
+                                        field.key,
+                                        e.target.value,
+                                      )
+                                    }
+                                    rows={3}
+                                    placeholder={field.name}
+                                  />
+                                </div>
+                              );
+                            }
+
+                            if (field.type === "BOOLEAN") {
+                              return (
+                                <div
+                                  key={field.id}
+                                  className="flex items-center space-x-2"
+                                >
+                                  <Checkbox
+                                    id={field.key}
+                                    checked={!!value}
+                                    onCheckedChange={(checked) =>
+                                      handleCustomFieldChange(
+                                        field.key,
+                                        checked,
+                                      )
+                                    }
+                                  />
+                                  <Label
+                                    htmlFor={field.key}
+                                    className="cursor-pointer"
+                                  >
+                                    {field.name}
+                                    {field.isRequired && (
+                                      <span className="ml-1 text-red-500">
+                                        *
+                                      </span>
+                                    )}
+                                  </Label>
+                                </div>
+                              );
+                            }
+
+                            // Default: TEXT, NUMBER, EMAIL, etc.
                             return (
                               <div key={field.id} className="space-y-2">
                                 <Label htmlFor={field.key}>
                                   {field.name}
-                                  {field.isRequired && <span className="text-red-500 ml-1">*</span>}
+                                  {field.isRequired && (
+                                    <span className="ml-1 text-red-500">*</span>
+                                  )}
                                 </Label>
-                                <Select
-                                  value={value}
-                                  onValueChange={(val) => handleCustomFieldChange(field.key, val)}
-                                >
-                                  <SelectTrigger id={field.key}>
-                                    <SelectValue placeholder={`Select ${field.name}`} />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {options.map((option) => (
-                                      <SelectItem key={option} value={option}>
-                                        {option}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            );
-                          }
-                          
-                          if (field.type === "TEXTAREA") {
-                            return (
-                              <div key={field.id} className="space-y-2 md:col-span-2">
-                                <Label htmlFor={field.key}>
-                                  {field.name}
-                                  {field.isRequired && <span className="text-red-500 ml-1">*</span>}
-                                </Label>
-                                <Textarea
+                                <Input
                                   id={field.key}
+                                  type={
+                                    field.type === "EMAIL"
+                                      ? "email"
+                                      : field.type === "NUMBER"
+                                        ? "number"
+                                        : "text"
+                                  }
                                   value={value}
-                                  onChange={(e) => handleCustomFieldChange(field.key, e.target.value)}
-                                  rows={3}
+                                  onChange={(e) =>
+                                    handleCustomFieldChange(
+                                      field.key,
+                                      e.target.value,
+                                    )
+                                  }
                                   placeholder={field.name}
                                 />
                               </div>
                             );
-                          }
-                          
-                          if (field.type === "BOOLEAN") {
-                            return (
-                              <div key={field.id} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={field.key}
-                                  checked={!!value}
-                                  onCheckedChange={(checked) => handleCustomFieldChange(field.key, checked)}
-                                />
-                                <Label htmlFor={field.key} className="cursor-pointer">
-                                  {field.name}
-                                  {field.isRequired && <span className="text-red-500 ml-1">*</span>}
-                                </Label>
-                              </div>
-                            );
-                          }
-                          
-                          // Default: TEXT, NUMBER, EMAIL, etc.
-                          return (
-                            <div key={field.id} className="space-y-2">
-                              <Label htmlFor={field.key}>
-                                {field.name}
-                                {field.isRequired && <span className="text-red-500 ml-1">*</span>}
-                              </Label>
-                              <Input
-                                id={field.key}
-                                type={field.type === "EMAIL" ? "email" : field.type === "NUMBER" ? "number" : "text"}
-                                value={value}
-                                onChange={(e) => handleCustomFieldChange(field.key, e.target.value)}
-                                placeholder={field.name}
-                              />
-                            </div>
-                          );
-                        })}
+                          })}
+                      </div>
                     </div>
-                  </div>
 
-                  <Separator />
-                </>
-              )}
+                    <Separator />
+                  </>
+                )}
 
               {/* Notes */}
               <div className="space-y-2">

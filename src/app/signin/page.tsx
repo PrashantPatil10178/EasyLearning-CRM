@@ -53,13 +53,24 @@ export default function SignInPage() {
         redirect: false,
       });
 
+      console.log("SignIn result:", result);
+
+      // Check for errors first - NextAuth v5 returns error property on failure
+      if (result?.error) {
+        toast.error("Invalid email or password");
+        return;
+      }
+
+      // Only show success if there's no error
       if (result?.ok) {
         toast.success("Login successful!");
         router.push("/dashboard");
       } else {
+        // Fallback error if ok is false but no error property
         toast.error("Invalid email or password");
       }
     } catch (error) {
+      console.error("Login error:", error);
       toast.error("Login failed. Please try again.");
     } finally {
       setLoading(false);
@@ -122,6 +133,14 @@ export default function SignInPage() {
         redirect: false,
       });
 
+      console.log("OTP SignIn result:", result);
+
+      // Check for errors first
+      if (result?.error) {
+        toast.error("Invalid OTP. Please check and try again.");
+        return;
+      }
+
       if (result?.ok) {
         toast.success("Login successful!");
         router.push("/dashboard");
@@ -129,6 +148,7 @@ export default function SignInPage() {
         toast.error("Invalid OTP. Please check and try again.");
       }
     } catch (error) {
+      console.error("OTP verification error:", error);
       toast.error("Verification failed. Please try again.");
     } finally {
       setLoading(false);

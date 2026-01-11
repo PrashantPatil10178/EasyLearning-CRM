@@ -1,13 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
+import { callEventEmitter } from "@/lib/call-events";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-
-    // Validate it's a call report
-    // The docs say "type": "call_report" or "call_report" event
-    // But the sample payload has "type": "call_report"
 
     const {
       type,
@@ -26,7 +23,40 @@ export async function POST(request: NextRequest) {
 
     console.log("[CallerDesk Webhook] Received:", body);
 
-    // We only care about call reports for now
+    // Helper function to clean phone numbers
+    const cleanPhone = (p: string) => {
+      if (!p) return "";
+      const cleaned = p.replace(/\D/g, "");
+      return cleaned.length > 10 ? cleaned.slice(-10) : cleaned;
+    };
+
+    // Handle live_call events (call in progress)
+    if (type === "live_call") {
+      // Emit real-time event for live call
+      const lead = await db.lead.findFirst({
+        where: {
+          phone: {
+            endsWith: cleanPhone(SourceNumber || DestinationNumber),
+          },
+        },
+      });
+
+      if (lead && lead.workspaceId) {
+        callEventEmitter.emitCallEvent({
+          type: "live_call",
+          workspaceId: lead.workspaceId,
+          call: {
+            toNumber: DestinationNumber,
+            fromNumber: SourceNumber,
+            status: Status,
+          },
+        });
+      }
+
+      return NextResponse.json({ message: "Live call event processed" });
+    }
+
+    // We only care about call reports for actual logging
     if (type !== "call_report" && !SourceNumber) {
       // Sometimes type might be missing or different, but SourceNumber is key
       return NextResponse.json({ message: "Ignored" });
@@ -53,13 +83,6 @@ export async function POST(request: NextRequest) {
       // Fallback
       leadPhone = DestinationNumber;
     }
-
-    // Clean phones (remove non-digits, take last 10)
-    const cleanPhone = (p: string) => {
-      if (!p) return "";
-      const cleaned = p.replace(/\D/g, "");
-      return cleaned.length > 10 ? cleaned.slice(-10) : cleaned;
-    };
 
     const leadPhoneClean = cleanPhone(leadPhone);
     const agentPhoneClean = cleanPhone(agentPhone);
@@ -160,7 +183,7 @@ export async function POST(request: NextRequest) {
     const endedAt = EndTime ? new Date(EndTime) : new Date();
 
     // Create Call Record
-    await db.call.create({
+    const callRecord = await db.call.create({
       data: {
         leadId: lead.id,
         userId: userId,
@@ -189,6 +212,43 @@ export async function POST(request: NextRequest) {
         performedAt: startedAt,
       },
     });
+
+    // Emit call completed event for real-time updates
+    console.log(
+      "[CallerDesk Webhook] Emitting call_completed event for workspace:",
+      lead.workspaceId,
+    );
+    console.log("[CallerDesk Webhook] Call data:", callRecord);
+    console.log("[CallerDesk Webhook] Lead data:", {
+      id: lead.id,
+      firstName: lead.firstName,
+      lastName: lead.lastName,
+    });
+
+    callEventEmitter.emitCallEvent({
+      type: "call_completed",
+      workspaceId: lead.workspaceId!,
+      call: {
+        ...callRecord,
+        lead: {
+          id: lead.id,
+          firstName: lead.firstName,
+          lastName: lead.lastName,
+          phone: lead.phone,
+          email: lead.email,
+          status: lead.status,
+          category: lead.category,
+          priority: lead.priority,
+          city: lead.city,
+          state: lead.state,
+          courseInterested: lead.courseInterested,
+          revenue: lead.revenue,
+          customFields: lead.customFields,
+        },
+      } as any,
+    });
+
+    console.log("[CallerDesk Webhook] Event emitted successfully");
 
     return NextResponse.json({ success: true });
   } catch (error) {

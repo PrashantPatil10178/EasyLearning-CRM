@@ -1,7 +1,12 @@
 "use client";
 
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
-import { httpBatchStreamLink, loggerLink } from "@trpc/client";
+import {
+  httpBatchStreamLink,
+  httpSubscriptionLink,
+  loggerLink,
+  splitLink,
+} from "@trpc/client";
 import { createTRPCReact } from "@trpc/react-query";
 import { type inferRouterInputs, type inferRouterOutputs } from "@trpc/server";
 import { useState } from "react";
@@ -51,24 +56,47 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
             // Don't log UNAUTHORIZED errors
             !op.result.message?.includes("UNAUTHORIZED"),
         }),
-        httpBatchStreamLink({
-          transformer: SuperJSON,
-          url: getBaseUrl() + "/api/trpc",
-          headers: () => {
-            const headers = new Headers();
-            headers.set("x-trpc-source", "nextjs-react");
-
-            // Add workspace ID from cookie if available
-            if (typeof window !== "undefined") {
-              const match = document.cookie.match(
-                new RegExp("(^| )workspace-id=([^;]+)"),
-              );
-              if (match) {
-                headers.set("x-workspace-id", match[2]);
+        splitLink({
+          condition: (op) => op.type === "subscription",
+          true: httpSubscriptionLink({
+            transformer: SuperJSON,
+            url: getBaseUrl() + "/api/trpc",
+            connectionParams: () => {
+              const params: Record<string, string> = {};
+              if (typeof window !== "undefined") {
+                const match = document.cookie.match(/workspace-id=([^;]+)/);
+                if (match?.[1]) {
+                  params["x-workspace-id"] = match[1];
+                  console.log(
+                    "[tRPC Subscription] Connecting with workspace:",
+                    match[1],
+                  );
+                } else {
+                  console.error(
+                    "[tRPC Subscription] No workspace-id found in cookie",
+                  );
+                }
               }
-            }
-            return headers;
-          },
+              return params;
+            },
+          }),
+          false: httpBatchStreamLink({
+            transformer: SuperJSON,
+            url: getBaseUrl() + "/api/trpc",
+            headers: () => {
+              const headers = new Headers();
+              headers.set("x-trpc-source", "nextjs-react");
+
+              // Add workspace ID from cookie if available
+              if (typeof window !== "undefined") {
+                const match = document.cookie.match(/workspace-id=([^;]+)/);
+                if (match?.[1]) {
+                  headers.set("x-workspace-id", match[1]);
+                }
+              }
+              return headers;
+            },
+          }),
         }),
       ],
     }),

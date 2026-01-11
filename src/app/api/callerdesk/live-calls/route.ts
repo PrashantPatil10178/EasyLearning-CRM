@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";
 import { decrypt, isEncrypted } from "@/lib/encryption";

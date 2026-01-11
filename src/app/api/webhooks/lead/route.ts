@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 
 /**
@@ -469,8 +469,8 @@ export async function POST(request: NextRequest) {
         email: email || null,
         phone: leadPhone,
         source: mappedSource as any,
-        status: status as any,
-        priority: priority as any,
+        status: status,
+        priority: priority,
         city,
         state,
         country,

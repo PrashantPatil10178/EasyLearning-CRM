@@ -10,8 +10,23 @@ import { createTRPCContext } from "@/server/api/trpc";
  * handling a HTTP request (e.g. when you make requests from Client Components).
  */
 const createContext = async (req: NextRequest) => {
+  const heads = new Headers(req.headers);
+  const url = new URL(req.url);
+  const connectionParamsStr = url.searchParams.get("connectionParams");
+
+  if (connectionParamsStr) {
+    try {
+      const connectionParams = JSON.parse(connectionParamsStr);
+      if (connectionParams["x-workspace-id"]) {
+        heads.set("x-workspace-id", connectionParams["x-workspace-id"]);
+      }
+    } catch (e) {
+      console.error("Failed to parse connectionParams", e);
+    }
+  }
+
   return createTRPCContext({
-    headers: req.headers,
+    headers: heads,
   });
 };
 

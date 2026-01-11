@@ -1,6 +1,6 @@
 'use client';
 
-import { FieldPath, FieldValues } from 'react-hook-form';
+import { type FieldPath, type FieldValues } from 'react-hook-form';
 import {
   FormControl,
   FormDescription,
@@ -9,8 +9,8 @@ import {
   FormLabel,
   FormMessage
 } from '@/components/ui/form';
-import { BaseFormFieldProps, FileUploadConfig } from '@/types/base-form';
-import { FileUploader, FileUploaderProps } from '@/components/file-uploader';
+import { type BaseFormFieldProps, type FileUploadConfig } from '@/types/base-form';
+import { FileUploader, type FileUploaderProps } from '@/components/file-uploader';
 
 interface FormFileUploadProps<
   TFieldValues extends FieldValues = FieldValues,

@@ -264,19 +264,18 @@ export function LeadWorkspace({
                   )}
                 </div>
                 {/* Assigned Agent */}
-                {(selectedLead as any).owner && (
+                {selectedLead.owner && (
                   <div className="mt-2 flex items-center gap-2">
                     <Avatar className="h-5 w-5">
                       <AvatarImage
-                        src={(selectedLead as any).owner.image || undefined}
+                        src={selectedLead.owner.image || undefined}
                       />
                       <AvatarFallback className="text-[10px]">
-                        {(selectedLead as any).owner.name?.charAt(0) || "?"}
+                        {selectedLead.owner.name?.charAt(0) || "?"}
                       </AvatarFallback>
                     </Avatar>
                     <span className="text-muted-foreground text-xs">
-                      Assigned to:{" "}
-                      <strong>{(selectedLead as any).owner.name}</strong>
+                      Assigned to: <strong>{selectedLead.owner.name}</strong>
                     </span>
                     <Button
                       size="sm"
@@ -386,7 +385,7 @@ export function LeadWorkspace({
                   <Input
                     type="number"
                     placeholder="0"
-                    value={revenue || (selectedLead as any).revenue || ""}
+                    value={revenue || selectedLead.revenue || ""}
                     onChange={(e) => setRevenue(e.target.value)}
                     className="h-8 text-sm"
                   />
@@ -477,11 +476,11 @@ export function LeadWorkspace({
                                 email: selectedLead.email || "",
                                 phone: selectedLead.phone || "",
                                 courseInterested:
-                                  (selectedLead as any).courseInterested || "",
+                                  selectedLead.courseInterested || "",
                                 city: selectedLead.city || "",
                                 state: selectedLead.state || "",
                                 priority: selectedLead.priority || "MEDIUM",
-                                revenue: (selectedLead as any).revenue || 0,
+                                revenue: selectedLead.revenue || 0,
                               });
                             }
                           }}
@@ -1036,9 +1035,29 @@ export function LeadWorkspace({
                                   </p>
                                 )}
                                 {renderActivityMessage(
-                                  (activity as any).message ||
-                                    activity.description,
+                                  activity.message || activity.description,
                                 )}
+                                {/* Show recording link for CALL activities */}
+                                {activity.type === "CALL" &&
+                                  (activity as any).callData?.recordingUrl && (
+                                    <div className="mt-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 gap-1.5 text-xs"
+                                        onClick={() =>
+                                          window.open(
+                                            (activity as any).callData
+                                              .recordingUrl,
+                                            "_blank",
+                                          )
+                                        }
+                                      >
+                                        <ExternalLink className="h-3 w-3" />
+                                        Listen to Recording
+                                      </Button>
+                                    </div>
+                                  )}
                               </div>
                             </div>
                           </div>

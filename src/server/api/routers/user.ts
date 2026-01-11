@@ -194,9 +194,20 @@ export const userRouter = createTRPCRouter({
             password: hashedPassword,
             role: input.role as never, // Keep global role for now
             phone: input.phone,
-            teamId: input.teamId,
+            // teamId: input.teamId, // Removed as it doesn't exist on User
           },
         });
+
+        // Add to team if provided
+        if (input.teamId) {
+          await ctx.db.teamMember.create({
+            data: {
+              userId: user.id,
+              teamId: input.teamId,
+              // role: "MEMBER",
+            },
+          });
+        }
       }
 
       // Map UserRole to WorkspaceRole
@@ -296,14 +307,37 @@ export const userRouter = createTRPCRouter({
         },
       });
 
-      // Also update global user role/team if needed (legacy support)
+      // Also update global user role if needed (legacy support)
       const user = await ctx.db.user.update({
         where: { id: input.id },
         data: {
           role: input.role as never,
-          teamId: input.teamId,
         },
       });
+
+      // Update team membership if provided
+      if (input.teamId) {
+        const existingMembership = await ctx.db.teamMember.findFirst({
+          where: { userId: input.id },
+        });
+
+        if (existingMembership) {
+          if (existingMembership.teamId !== input.teamId) {
+            await ctx.db.teamMember.update({
+              where: { id: existingMembership.id },
+              data: { teamId: input.teamId },
+            });
+          }
+        } else {
+          await ctx.db.teamMember.create({
+            data: {
+              userId: input.id,
+              teamId: input.teamId,
+              role: "MEMBER",
+            },
+          });
+        }
+      }
 
       return user;
     }),

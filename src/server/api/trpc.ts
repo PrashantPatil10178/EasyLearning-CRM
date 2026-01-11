@@ -164,8 +164,17 @@ export const adminProcedure = t.procedure
  * Ensures the user is authenticated and is a member of the requested workspace.
  */
 export const protectedWorkspaceProcedure = protectedProcedure.use(
-  async ({ ctx, next }) => {
+  async ({ ctx, next, type, path }) => {
     const { workspaceId, db, session } = ctx;
+
+    console.log(
+      "[protectedWorkspaceProcedure] Type:",
+      type,
+      "Path:",
+      path,
+      "WorkspaceId:",
+      workspaceId,
+    );
 
     if (!workspaceId) {
       throw new TRPCError({

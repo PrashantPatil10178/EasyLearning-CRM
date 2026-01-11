@@ -34,11 +34,27 @@ export default function SignUpPage() {
       return;
     }
     setLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    alert("Account created! Please sign in.");
-    router.push("/signin");
-    setLoading(false);
+
+    try {
+      const response = await fetch("/api/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to sign up");
+      }
+
+      alert("Account created successfully! Please sign in.");
+      router.push("/signin");
+    } catch (error: any) {
+      alert(error.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGoogleSignIn = () => {

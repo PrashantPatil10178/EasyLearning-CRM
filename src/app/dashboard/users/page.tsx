@@ -1,6 +1,6 @@
 import UserViewPage from "@/features/users/components/user-view-page";
 import { searchParamsCache } from "@/lib/searchparams";
-import { SearchParams } from "nuqs/server";
+import { type SearchParams } from "nuqs/server";
 
 type PageProps = {
   searchParams: Promise<SearchParams>;

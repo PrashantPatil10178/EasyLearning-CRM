@@ -1,6 +1,6 @@
 'use client';
 
-import { FieldPath, FieldValues } from 'react-hook-form';
+import { type FieldPath, type FieldValues } from 'react-hook-form';
 import {
   FormControl,
   FormDescription,
@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { BaseFormFieldProps, RadioGroupOption } from '@/types/base-form';
+import { type BaseFormFieldProps, type RadioGroupOption } from '@/types/base-form';
 
 interface FormRadioGroupProps<
   TFieldValues extends FieldValues = FieldValues,

@@ -4,6 +4,8 @@ import {
   protectedWorkspaceProcedure,
 } from "@/server/api/trpc";
 import { TRPCError } from "@trpc/server";
+import { observable } from "@trpc/server/observable";
+import { callEventEmitter } from "@/lib/call-events";
 
 export const callLogRouter = createTRPCRouter({
   // Get all calls
@@ -145,42 +147,6 @@ export const callLogRouter = createTRPCRouter({
         data: {
           lastContactAt: new Date(),
           ...(input.nextFollowUp && { nextFollowUp: input.nextFollowUp }),
-        },
-      });
-
-      return call;
-    }),
-
-  // Update call
-  update: protectedWorkspaceProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        notes: z.string().optional(),
-        outcome: z.string().optional(),
-        duration: z.number().optional(),
-        nextFollowUp: z.date().optional(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const { id, ...data } = input;
-
-      const existingCall = await ctx.db.call.findFirst({
-        where: { id, workspaceId: ctx.workspaceId },
-      });
-
-      if (!existingCall) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Call not found or you don't have access",
-        });
-      }
-
-      const call = await ctx.db.call.update({
-        where: { id },
-        data: {
-          ...data,
-          outcome: data.outcome as never,
         },
       });
 
@@ -414,4 +380,114 @@ export const callLogRouter = createTRPCRouter({
 
       return { success: true, callId: call.id };
     }),
+
+  // Update call details (notes, outcome) and optional lead status
+  update: protectedWorkspaceProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        notes: z.string().optional(),
+        outcome: z.string().optional(),
+        leadStatus: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const call = await ctx.db.call.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!call) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Call not found",
+        });
+      }
+
+      if (call.workspaceId !== ctx.workspaceId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have permission to update this call",
+        });
+      }
+
+      const updatedCall = await ctx.db.call.update({
+        where: { id: input.id },
+        data: {
+          notes: input.notes,
+          outcome: input.outcome as any,
+        },
+      });
+
+      // Update Lead Status if provided
+      if (input.leadStatus) {
+        await ctx.db.lead.update({
+          where: { id: call.leadId },
+          data: { status: input.leadStatus },
+        });
+
+        // Log status change activity
+        await ctx.db.activity.create({
+          data: {
+            type: "STATUS_CHANGE",
+            subject: "Status Updated",
+            description: `Status updated to ${input.leadStatus} from call popup`,
+            leadId: call.leadId,
+            userId: ctx.session.user.id,
+            workspaceId: ctx.workspaceId,
+            performedAt: new Date(),
+          },
+        });
+      }
+
+      return updatedCall;
+    }),
+
+  // Real-time subscription for call events
+  onCallEvent: protectedWorkspaceProcedure.subscription(({ ctx }) => {
+    console.log(
+      "[onCallEvent Subscription] Client connected for workspace:",
+      ctx.workspaceId,
+    );
+    return observable((emit) => {
+      console.log("[onCallEvent Subscription] Observable function called");
+      const onEvent = (event: any) => {
+        console.log(
+          "[onCallEvent Subscription] Event received:",
+          event.type,
+          "for workspace:",
+          event.workspaceId,
+        );
+        console.log(
+          "[onCallEvent Subscription] Current user workspace:",
+          ctx.workspaceId,
+        );
+        // Only emit events for the current workspace
+        if (event.workspaceId === ctx.workspaceId) {
+          console.log("[onCallEvent Subscription] Emitting event to client");
+          emit.next(event);
+        } else {
+          console.log(
+            "[onCallEvent Subscription] Workspace mismatch, not emitting",
+          );
+        }
+      };
+
+      // Subscribe to call events
+      callEventEmitter.on("call-event", onEvent);
+      console.log(
+        "[onCallEvent Subscription] Listener registered, total listeners:",
+        callEventEmitter.listenerCount("call-event"),
+      );
+
+      // Cleanup on unsubscribe
+      return () => {
+        console.log("[onCallEvent Subscription] Client disconnected");
+        callEventEmitter.off("call-event", onEvent);
+        console.log(
+          "[onCallEvent Subscription] Listener removed, remaining:",
+          callEventEmitter.listenerCount("call-event"),
+        );
+      };
+    });
+  }),
 });

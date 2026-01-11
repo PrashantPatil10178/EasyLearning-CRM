@@ -37,7 +37,7 @@ export function decrypt(text: string): string {
 /**
  * Mask sensitive string - show only last 4 characters
  */
-export function maskString(str: string, visibleChars: number = 4): string {
+export function maskString(str: string, visibleChars = 4): string {
   if (!str || str.length <= visibleChars) {
     return "****";
   }

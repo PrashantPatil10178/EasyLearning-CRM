@@ -106,11 +106,11 @@ export function LeadList({
                           {cl.lead.phone}
                         </span>
                       </div>
-                      {(cl.lead as any).courseInterested && (
+                      {(cl.lead).courseInterested && (
                         <div className="text-muted-foreground mb-2 flex min-w-0 items-start gap-1 text-xs">
                           <Tag className="mt-0.5 h-3 w-3 flex-shrink-0" />
                           <span className="line-clamp-2 min-w-0 flex-1 break-words">
-                            {(cl.lead as any).courseInterested}
+                            {(cl.lead).courseInterested}
                           </span>
                         </div>
                       )}

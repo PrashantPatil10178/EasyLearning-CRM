@@ -55,17 +55,13 @@ export function BarGraph() {
             <Tooltip
               cursor={{ fill: "transparent" }}
               contentStyle={{
-                backgroundColor: "hsl(var(--background))",
-                borderColor: "hsl(var(--border))",
+                backgroundColor: "(var(--background)",
+                borderColor: "var(--border)",
                 borderRadius: "var(--radius)",
-                color: "hsl(var(--foreground))",
+                color: "var(--foreground)",
               }}
             />
-            <Bar
-              dataKey="total"
-              fill="hsl(var(--primary))"
-              radius={[4, 4, 0, 0]}
-            />
+            <Bar dataKey="total" fill="var(--primary)" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

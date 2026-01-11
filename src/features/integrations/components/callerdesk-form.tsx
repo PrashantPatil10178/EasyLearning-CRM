@@ -92,7 +92,7 @@ export function CallerDeskForm() {
 
   const getMembersMutation = api.integration.getCallerDeskMembers.useMutation({
     onSuccess: (data) => {
-      if (data && data.getmember) {
+      if (data?.getmember) {
         setCallerDeskMembers(data.getmember);
 
         // Calculate stats
@@ -138,7 +138,7 @@ export function CallerDeskForm() {
   const getIVRNumbersMutation =
     api.integration.getCallerDeskIVRNumbers.useMutation({
       onSuccess: (data) => {
-        if (data && data.getdeskphone) {
+        if (data?.getdeskphone) {
           setIvrNumbers(data.getdeskphone);
           toast.success(`Fetched ${data.getdeskphone.length} IVR numbers`);
         }

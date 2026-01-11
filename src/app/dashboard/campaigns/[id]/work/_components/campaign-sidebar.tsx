@@ -18,7 +18,7 @@ import {
 } from "recharts";
 import { useMemo } from "react";
 import {
-  ChartConfig,
+  type ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
@@ -326,7 +326,7 @@ export function CampaignSidebar({
                 </CardHeader>
                 <CardContent>
                   <div className="max-h-28 overflow-y-auto">
-                    {campaign.team && campaign.team.members ? (
+                    {campaign.team?.members ? (
                       <div className="space-y-2">
                         {campaign.team.members.map((teamMember: any) => (
                           <div

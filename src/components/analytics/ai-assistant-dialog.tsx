@@ -334,7 +334,7 @@ export function AIAssistantDialog({
 
               <Button
                 type="submit"
-                disabled={!input || !input.trim() || isLoading}
+                disabled={!input?.trim() || isLoading}
                 size="icon"
                 className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 w-10 rounded-full disabled:opacity-50"
               >
