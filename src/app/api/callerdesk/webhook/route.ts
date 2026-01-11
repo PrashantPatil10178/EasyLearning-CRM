@@ -4,6 +4,18 @@ import { callEventEmitter } from "@/lib/call-events";
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify webhook token from query parameter
+    const { searchParams } = new URL(request.url);
+    const token = searchParams.get("token");
+
+    if (!token) {
+      console.log("[CallerDesk Webhook] Missing token");
+      return NextResponse.json(
+        { error: "Missing webhook token" },
+        { status: 401 },
+      );
+    }
+
     const body = await request.json();
 
     const {
@@ -117,13 +129,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Lead not found" });
     }
 
-    // Check if integration is enabled
+    // Check if integration is enabled and verify webhook token
     const integration = lead.workspace?.integrations?.[0];
-    if (integration && !integration.isEnabled) {
+    if (!integration) {
+      console.log(
+        `[CallerDesk Webhook] No integration found for workspace ${lead.workspaceId}`,
+      );
+      return NextResponse.json(
+        { error: "Integration not configured" },
+        { status: 404 },
+      );
+    }
+
+    if (!integration.isEnabled) {
       console.log(
         `[CallerDesk Webhook] Integration disabled for workspace ${lead.workspaceId}`,
       );
-      return NextResponse.json({ message: "Integration disabled" });
+      return NextResponse.json(
+        { error: "Integration disabled" },
+        { status: 403 },
+      );
+    }
+
+    // Verify webhook token
+    try {
+      const config = JSON.parse(integration.config);
+      if (config.webhookToken !== token) {
+        console.log(
+          `[CallerDesk Webhook] Invalid token for workspace ${lead.workspaceId}`,
+        );
+        return NextResponse.json(
+          { error: "Invalid webhook token" },
+          { status: 401 },
+        );
+      }
+    } catch (e) {
+      console.error("[CallerDesk Webhook] Failed to parse config", e);
+      return NextResponse.json(
+        { error: "Invalid integration configuration" },
+        { status: 500 },
+      );
     }
 
     // Find User (Agent)

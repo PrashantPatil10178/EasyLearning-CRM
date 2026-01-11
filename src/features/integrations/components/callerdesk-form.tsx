@@ -54,6 +54,7 @@ const formSchema = z.object({
   apiKey: z.string().min(1, "API Key is required"),
   secretKey: z.string().optional(),
   deskPhone: z.string().min(1, "Deskphone number is required"),
+  webhookToken: z.string().min(1, "Webhook token is required"),
   isEnabled: z.boolean(),
   createIncomingLead: z.boolean(),
   allowBreak: z.boolean(),
@@ -154,6 +155,7 @@ export function CallerDeskForm() {
       apiKey: "",
       secretKey: "",
       deskPhone: "",
+      webhookToken: "",
       isEnabled: true,
       createIncomingLead: true,
       allowBreak: true,
@@ -171,6 +173,7 @@ export function CallerDeskForm() {
           apiKey: config.apiKey || "",
           secretKey: config.secretKey || "",
           deskPhone: config.deskPhone || "",
+          webhookToken: config.webhookToken || "",
           isEnabled: integration.isEnabled ?? true,
           createIncomingLead: config.createIncomingLead ?? true,
           allowBreak: config.allowBreak ?? true,
@@ -203,6 +206,7 @@ export function CallerDeskForm() {
         apiKey: values.apiKey,
         secretKey: values.secretKey,
         deskPhone: values.deskPhone,
+        webhookToken: values.webhookToken,
         createIncomingLead: values.createIncomingLead,
         allowBreak: values.allowBreak,
       }),
@@ -348,21 +352,64 @@ export function CallerDeskForm() {
               )}
             />
 
+            <FormField
+              control={form.control}
+              name="webhookToken"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Webhook Security Token *</FormLabel>
+                  <div className="flex gap-2">
+                    <FormControl>
+                      <Input
+                        placeholder="Webhook security token"
+                        {...field}
+                        readOnly
+                        className="bg-muted"
+                      />
+                    </FormControl>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        const token = crypto.randomUUID();
+                        field.onChange(token);
+                        toast.success("New security token generated");
+                      }}
+                    >
+                      Generate
+                    </Button>
+                  </div>
+                  <FormDescription>
+                    Security token to verify webhook authenticity. Generate and
+                    save it.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-6">
             <FormItem>
-              <FormLabel>Webhook URL</FormLabel>
+              <FormLabel>Webhook URL (Copy to CallerDesk)</FormLabel>
               <div className="flex items-center gap-2">
                 <Input
                   readOnly
-                  value={`${typeof window !== "undefined" ? window.location.origin : ""}/api/callerdesk/webhook`}
-                  className="bg-muted"
+                  value={
+                    form.watch("webhookToken")
+                      ? `${typeof window !== "undefined" ? window.location.origin : ""}/api/callerdesk/webhook?token=${form.watch("webhookToken")}`
+                      : "Generate webhook token first"
+                  }
+                  className="bg-muted font-mono text-xs"
                 />
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
+                  disabled={!form.watch("webhookToken")}
                   onClick={() =>
                     copyToClipboard(
-                      `${typeof window !== "undefined" ? window.location.origin : ""}/api/callerdesk/webhook`,
+                      `${typeof window !== "undefined" ? window.location.origin : ""}/api/callerdesk/webhook?token=${form.watch("webhookToken")}`,
                     )
                   }
                 >
@@ -370,7 +417,8 @@ export function CallerDeskForm() {
                 </Button>
               </div>
               <FormDescription>
-                Add this URL in CallerDesk webhook settings
+                Copy this complete URL with the security token and add it in
+                CallerDesk webhook settings
               </FormDescription>
             </FormItem>
           </div>
